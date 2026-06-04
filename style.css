@@ -1959,3 +1959,21 @@ select.input-field {
 #nut-auto-block label, #nut-manual-block label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 700; color: var(--text-muted); margin-bottom: 12px; }
 .auto-preview { background: var(--primary-50); border: 1px solid var(--primary-light); border-radius: var(--radius-sm); padding: 12px 14px; text-align: center; font-size: 14px; color: var(--text); margin-top: 4px; }
 .auto-preview strong { font-size: 22px; color: var(--primary); }
+
+/* ─── Tutorial / geführte Tour ───────────────────────────────────────────── */
+#tutorial-root.tut-on { position: fixed; inset: 0; z-index: 9000; }
+.tut-overlay { position: fixed; inset: 0; z-index: 9000; }
+/* abgedunkelter Hintergrund nur bei zentrierten Schritten (ohne Ziel) */
+#tutorial-root.tut-dim .tut-overlay { background: rgba(0,0,0,.72); }
+/* Spotlight: transparentes Loch, Rest abgedunkelt via riesigem Schatten */
+.tut-spotlight { position: fixed; border-radius: 14px; box-shadow: 0 0 0 9999px rgba(0,0,0,.72); transition: all .3s ease; pointer-events: none; }
+.tut-tip { position: fixed; z-index: 9001; max-width: 460px; margin: 0 auto; background: var(--surface); color: var(--text); border-radius: var(--radius); padding: 18px 18px 14px; box-shadow: var(--shadow-lg); border: 1px solid var(--border); animation: tutPop .22s ease; }
+.tut-tip-center { left: 16px; right: 16px; }
+@keyframes tutPop { from { transform: scale(.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.tut-progress { font-size: 12px; font-weight: 800; color: var(--primary); letter-spacing: .04em; margin-bottom: 6px; }
+.tut-tip h4 { margin: 0 0 6px; font-size: 18px; font-weight: 800; color: var(--text); }
+.tut-tip p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text-muted); }
+.tut-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; gap: 12px; }
+.tut-skip { background: none; border: none; color: var(--text-muted); font-size: 14px; font-weight: 600; cursor: pointer; padding: 8px 4px; }
+.tut-next { background: var(--grad-primary); color: #fff; border: none; border-radius: var(--radius-sm); font-weight: 800; font-size: 15px; padding: 11px 26px; cursor: pointer; box-shadow: var(--shadow-primary); }
+.tut-next:active { transform: scale(.97); }

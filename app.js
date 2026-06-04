@@ -2262,6 +2262,7 @@ function enterApp() {
   const acc = document.getElementById('account-section');
   if (acc) acc.style.display = u ? 'block' : 'none';
   navigate('dashboard');
+  maybeStartTutorial();
 }
 
 function routeAfterAuth() {
@@ -2825,6 +2826,100 @@ function saveNutGoals() {
   closeFoodModal();
   renderNutrition();
   showToast('✓ Tagesziel gespeichert');
+}
+
+// ─── Tutorial / geführte Tour (Coach-Marks) ────────────────────────────────────
+
+// Schritte: target = CSS-Selektor (oder null für zentrierte Box).
+const TUTORIAL_STEPS = [
+  { target: null, title: 'Willkommen bei Strong Gnome! 🧙', text: 'In ein paar Sekunden zeige ich dir, wo alles ist. Tippe auf „Weiter".' },
+  { target: '#page-dashboard .card', title: 'Dein Fortschritt', text: 'Hier siehst du dein Gewicht auf dem Weg zum Ziel.' },
+  { target: '#dash-nut', title: 'Heute gegessen', text: 'Deine Kalorien von heute auf einen Blick — tippen für Details.' },
+  { target: 'nav .nav-btn[data-page="nutrition"]', title: 'Essen', text: 'Mahlzeiten & Kalorien eintragen, Tagesziel festlegen.' },
+  { target: 'nav .nav-btn[data-page="training"]', title: 'Training', text: 'Deine Trainingspläne und Workouts starten.' },
+  { target: 'nav .nav-btn[data-page="history"]', title: 'Verlauf', text: 'Alle vergangenen Workouts zum Nachschauen.' },
+  { target: 'nav .nav-btn[data-page="checkin"]', title: 'Check-in', text: 'Gewicht und Körpermaße regelmäßig eintragen.' },
+  { target: 'nav .nav-btn[data-page="stats"]', title: 'Statistik', text: 'Diagramme zu Gewicht, Kraft und Maßen.' },
+  { target: '.icon-btn-badged', title: 'Profil & Freunde', text: 'Einstellungen, Freunde verbinden und Pläne teilen.' },
+  { target: '#skin-toggle', title: 'Design wechseln', text: 'Wechsle jederzeit zwischen Rosé und maskulinem Stil.' },
+  { target: null, title: 'Fertig! 💪', text: 'Das war die Tour. Du findest sie jederzeit wieder im Profil. Viel Erfolg!' },
+];
+let tutorialIdx = 0;
+
+function maybeStartTutorial() {
+  const data = loadData();
+  if (data.settings.tutorialDone) return;     // einmalig (für alle Bestands- + neuen Nutzer)
+  setTimeout(() => startTutorial(), 700);      // App erst rendern lassen
+}
+
+function startTutorial() {
+  tutorialIdx = 0;
+  if (!document.getElementById('tutorial-root')) {
+    const r = document.createElement('div'); r.id = 'tutorial-root'; document.body.appendChild(r);
+  }
+  tutorialRender();
+}
+
+function tutorialRender() {
+  const root = document.getElementById('tutorial-root');
+  if (!root) return;
+  const step = TUTORIAL_STEPS[tutorialIdx];
+  const last = tutorialIdx === TUTORIAL_STEPS.length - 1;
+  const targetEl = step.target ? document.querySelector(step.target) : null;
+  if (targetEl) targetEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+
+  // nach evtl. Scrollen Positionen messen
+  setTimeout(() => {
+    const rect = targetEl ? targetEl.getBoundingClientRect() : null;
+    const pad = 8;
+    let spot = '';
+    if (rect) {
+      spot = `<div class="tut-spotlight" style="left:${rect.left - pad}px;top:${rect.top - pad}px;width:${rect.width + pad * 2}px;height:${rect.height + pad * 2}px"></div>`;
+    }
+    // Tooltip-Position: bei Ziel oben → darunter, sonst darüber; ohne Ziel → zentriert
+    let tipStyle = 'left:16px;right:16px;';
+    let centered = false;
+    if (!rect) { tipStyle += 'top:50%;transform:translateY(-50%);'; centered = true; }
+    else if (rect.top < window.innerHeight / 2) tipStyle += `top:${rect.bottom + 16}px;`;
+    else tipStyle += `bottom:${window.innerHeight - rect.top + 16}px;`;
+
+    root.className = 'tut-on' + (rect ? '' : ' tut-dim');
+    root.innerHTML = `
+      <div class="tut-overlay" onclick="tutorialNext()">
+        ${spot}
+        <div class="tut-tip ${centered ? 'tut-tip-center' : ''}" style="${tipStyle}" onclick="event.stopPropagation()">
+          <div class="tut-progress">${tutorialIdx + 1} / ${TUTORIAL_STEPS.length}</div>
+          <h4>${escapeHtml(step.title)}</h4>
+          <p>${escapeHtml(step.text)}</p>
+          <div class="tut-actions">
+            ${last ? '<span></span>' : '<button class="tut-skip" onclick="tutorialEnd()">Überspringen</button>'}
+            <button class="tut-next" onclick="tutorialNext()">${last ? "Los geht's!" : 'Weiter'}</button>
+          </div>
+        </div>
+      </div>`;
+  }, targetEl ? 280 : 0);
+}
+
+function tutorialNext() {
+  if (tutorialIdx >= TUTORIAL_STEPS.length - 1) { tutorialEnd(); return; }
+  tutorialIdx++;
+  tutorialRender();
+}
+
+function tutorialEnd() {
+  const root = document.getElementById('tutorial-root');
+  if (root) root.remove();
+  const data = loadData();
+  data.settings.tutorialDone = true;
+  saveData(data);
+}
+
+// Vom Profil aus erneut starten (Flag zurücksetzen, damit es sauber durchläuft)
+function replayTutorial() {
+  const data = loadData();
+  data.settings.tutorialDone = false;
+  saveData(data);
+  if (document.body.dataset.state === 'app') { navigate('dashboard'); startTutorial(); }
 }
 
 // ─── Bootstrap ────────────────────────────────────────────────────────────────
