@@ -2871,24 +2871,40 @@ function tutorialRender() {
   // nach evtl. Scrollen Positionen messen
   setTimeout(() => {
     const rect = targetEl ? targetEl.getBoundingClientRect() : null;
-    const pad = 8;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const pad = 6;
     let spot = '';
     if (rect) {
       spot = `<div class="tut-spotlight" style="left:${rect.left - pad}px;top:${rect.top - pad}px;width:${rect.width + pad * 2}px;height:${rect.height + pad * 2}px"></div>`;
     }
-    // Tooltip-Position: bei Ziel oben → darunter, sonst darüber; ohne Ziel → zentriert
-    let tipStyle = 'left:16px;right:16px;';
-    let centered = false;
-    if (!rect) { tipStyle += 'top:50%;transform:translateY(-50%);'; centered = true; }
-    else if (rect.top < window.innerHeight / 2) tipStyle += `top:${rect.bottom + 16}px;`;
-    else tipStyle += `bottom:${window.innerHeight - rect.top + 16}px;`;
+
+    // kompakte Blase, mittig über dem Ziel (geklemmt), mit Pfeil aufs Ziel
+    let centered = false, caret = '', tipStyle = '';
+    if (!rect) {
+      centered = true;
+      tipStyle = `width:${Math.min(300, vw - 32)}px;left:50%;top:50%;transform:translate(-50%,-50%);`;
+    } else {
+      const tipW = Math.min(280, vw - 24);
+      let left = rect.left + rect.width / 2 - tipW / 2;
+      left = Math.max(12, Math.min(left, vw - tipW - 12));
+      const caretX = Math.max(18, Math.min(rect.left + rect.width / 2 - left, tipW - 18));
+      const below = rect.top < vh / 2;   // Ziel oben → Blase darunter
+      if (below) {
+        tipStyle = `width:${tipW}px;left:${left}px;top:${rect.bottom + 14}px;`;
+        caret = `<span class="tut-caret tut-caret-up" style="left:${caretX}px"></span>`;
+      } else {
+        tipStyle = `width:${tipW}px;left:${left}px;bottom:${vh - rect.top + 14}px;`;
+        caret = `<span class="tut-caret tut-caret-down" style="left:${caretX}px"></span>`;
+      }
+    }
 
     root.className = 'tut-on' + (rect ? '' : ' tut-dim');
     root.innerHTML = `
       <div class="tut-overlay" onclick="tutorialNext()">
         ${spot}
         <div class="tut-tip ${centered ? 'tut-tip-center' : ''}" style="${tipStyle}" onclick="event.stopPropagation()">
-          <div class="tut-progress">${tutorialIdx + 1} / ${TUTORIAL_STEPS.length}</div>
+          ${caret}
+          <div class="tut-progress">Schritt ${tutorialIdx + 1} von ${TUTORIAL_STEPS.length}</div>
           <h4>${escapeHtml(step.title)}</h4>
           <p>${escapeHtml(step.text)}</p>
           <div class="tut-actions">
