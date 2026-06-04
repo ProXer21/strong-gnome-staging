@@ -1894,10 +1894,29 @@ body:not([data-state="app"]) .page { display: none !important; }
 .nm-add { width: 100%; margin-top: 10px; padding: 10px; border: 1.5px dashed var(--border); border-radius: var(--radius-sm); background: transparent; color: var(--primary); font-weight: 800; font-size: 14px; cursor: pointer; }
 .nm-add:active { background: var(--primary-50); }
 
-/* Bottom-Sheet-Modal (nur Ernährung — globale .modal-overlay bleibt unangetastet) */
-#nut-modal-root .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: flex-end; justify-content: center; z-index: 600; }
-.modal-sheet { background: var(--surface); width: 100%; max-width: 520px; border-radius: 22px 22px 0 0; padding: 18px 18px calc(18px + env(safe-area-inset-bottom)); max-height: 88vh; overflow-y: auto; box-shadow: var(--shadow-lg); animation: sheetUp .25s ease; }
-@keyframes sheetUp { from { transform: translateY(40px); opacity: .6; } to { transform: translateY(0); opacity: 1; } }
+/* Modal (nur Ernährung — globale .modal-overlay bleibt unangetastet) — zentriert */
+#nut-modal-root .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; z-index: 600; padding: 16px; }
+.modal-sheet { background: var(--surface); width: 100%; max-width: 480px; border-radius: 22px; padding: 18px; max-height: 86vh; overflow-y: auto; -webkit-overflow-scrolling: touch; box-shadow: var(--shadow-lg); animation: sheetPop .22s ease; }
+@keyframes sheetPop { from { transform: scale(.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+/* Hintergrund nicht scrollbar, solange ein Ernährungs-Modal offen ist */
+body.nut-modal-open { overflow: hidden; touch-action: none; }
+
+/* Themen-sichere Eingabefelder (Klasse direkt am input/select/textarea) — IMMER über CSS-Variablen */
+input.input-field, select.input-field, textarea.input-field {
+  width: 100%; box-sizing: border-box; margin: 0;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  padding: 12px 14px; font-family: inherit; font-size: 16px; font-weight: 600;
+  background: var(--bg); color: var(--text); outline: none;
+  -webkit-appearance: none; appearance: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+input.input-field::placeholder, textarea.input-field::placeholder { color: var(--text-muted); opacity: .75; }
+input.input-field:focus, select.input-field:focus, textarea.input-field:focus { border-color: var(--primary); box-shadow: var(--ring); }
+select.input-field {
+  padding-right: 38px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 13px center;
+}
 .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .modal-head h3 { margin: 0; font-size: 18px; }
 .modal-x { background: var(--border); border: none; width: 32px; height: 32px; border-radius: 50%; font-size: 14px; cursor: pointer; color: var(--text); }

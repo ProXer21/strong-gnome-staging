@@ -2550,6 +2550,7 @@ function openFoodModal(meal, entryId) {
   const editing = entryId ? data.nutrition.log.find(e => e.id === entryId) : null;
   const root = document.getElementById('nut-modal-root');
   if (!root) return;
+  document.body.classList.add('nut-modal-open');   // Hintergrund-Scroll sperren
 
   const savedFoods = data.nutrition.foods.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', 'de'));
   const savedHtml = savedFoods.length ? savedFoods.map(f => `
@@ -2599,6 +2600,7 @@ function closeFoodModal() {
   const root = document.getElementById('nut-modal-root');
   if (root) root.innerHTML = '';
   nutModalMeal = null;
+  document.body.classList.remove('nut-modal-open');   // Hintergrund-Scroll wieder freigeben
 }
 
 function nutPickSaved(id) {
@@ -2663,6 +2665,7 @@ function openNutGoals() {
   const auto = computeAutoGoals(data);
   const root = document.getElementById('nut-modal-root');
   if (!root) return;
+  document.body.classList.add('nut-modal-open');   // Hintergrund-Scroll sperren
   const actOpts = [
     { v: 1.2,   t: 'wenig (Bürojob)' },
     { v: 1.375, t: 'leicht aktiv (1–3×/Woche)' },
