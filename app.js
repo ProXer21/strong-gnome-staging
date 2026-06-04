@@ -2553,12 +2553,11 @@ function openFoodModal(meal, entryId) {
   document.body.classList.add('nut-modal-open');   // Hintergrund-Scroll sperren
 
   const savedFoods = data.nutrition.foods.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', 'de'));
-  const savedHtml = savedFoods.length ? savedFoods.map(f => `
-    <button type="button" class="saved-food" onclick="nutPickSaved('${f.id}')">
-      <span class="sf-name">${escapeHtml(f.name)}</span>
-      <span class="sf-kcal">${Math.round(f.kcal || 0)} kcal</span>
-      <span class="sf-del" onclick="event.stopPropagation(); nutDeleteFood('${f.id}')" aria-label="Löschen">✕</span>
-    </button>`).join('') : '<p class="nut-empty">Noch keine gespeicherten Lebensmittel.</p>';
+  // Dropdown-Optionen (kompakt, egal wie viele gespeichert sind)
+  const savedOptions = savedFoods.map(f =>
+    `<option value="${f.id}">${escapeHtml(f.name)} · ${Math.round(f.kcal || 0)} kcal</option>`).join('');
+  // Tipp-Vorschläge beim Eintippen (datalist)
+  const dataListOptions = savedFoods.map(f => `<option value="${escapeHtml(f.name)}">`).join('');
 
   root.innerHTML = `
   <div class="modal-overlay" onclick="if(event.target===this)closeFoodModal()">
@@ -2567,15 +2566,24 @@ function openFoodModal(meal, entryId) {
         <h3>${editing ? 'Eintrag bearbeiten' : 'Hinzufügen'}</h3>
         <button class="modal-x" onclick="closeFoodModal()" aria-label="Schließen">✕</button>
       </div>
-      ${editing ? '' : `
+      ${editing || !savedFoods.length ? '' : `
       <div class="saved-foods-block">
         <div class="sfb-label">Meine Lebensmittel</div>
-        <div class="saved-foods">${savedHtml}</div>
+        <div class="sfb-row">
+          <select id="nf-saved" class="input-field" onchange="nutPickSavedSel(this.value)">
+            <option value="">— gespeichertes wählen —</option>
+            ${savedOptions}
+          </select>
+          <button type="button" class="sfb-del" id="nf-saved-del" onclick="nutDeleteSelectedFood()" aria-label="Ausgewähltes löschen" title="Ausgewähltes löschen" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
       </div>
       <div class="modal-divider"><span>oder neu eingeben</span></div>`}
       <div class="modal-form">
         <label>Bezeichnung
-          <input id="nf-name" class="input-field" type="text" placeholder="z. B. Haferflocken mit Milch" value="${editing ? escapeHtml(editing.name || '') : ''}">
+          <input id="nf-name" class="input-field" type="text" list="nf-foodlist" autocomplete="off" oninput="nutNameSuggest()" placeholder="z. B. Haferflocken mit Milch" value="${editing ? escapeHtml(editing.name || '') : ''}">
+          <datalist id="nf-foodlist">${dataListOptions}</datalist>
         </label>
         <label>Kalorien (kcal)
           <input id="nf-kcal" class="input-field" type="number" inputmode="decimal" min="0" placeholder="0" value="${editing ? (editing.kcal ?? '') : ''}">
@@ -2609,6 +2617,36 @@ function nutPickSaved(id) {
   if (!f) return;
   const set = (i, v) => { const el = document.getElementById(i); if (el) el.value = (v ?? 0); };
   set('nf-name', f.name); set('nf-kcal', f.kcal); set('nf-protein', f.protein); set('nf-carbs', f.carbs); set('nf-fat', f.fat);
+}
+
+// Auswahl aus dem Dropdown „Meine Lebensmittel" → Formular füllen + Löschen-Button aktivieren
+function nutPickSavedSel(id) {
+  const del = document.getElementById('nf-saved-del');
+  if (del) del.disabled = !id;
+  if (id) nutPickSaved(id);
+}
+
+// Beim Tippen in „Bezeichnung": passt der Name exakt zu einem gespeicherten Lebensmittel,
+// Werte automatisch übernehmen (schneller Eintrag).
+function nutNameSuggest() {
+  const name = (document.getElementById('nf-name')?.value || '').trim().toLowerCase();
+  if (!name) return;
+  const data = loadData();
+  const f = data.nutrition.foods.find(x => (x.name || '').trim().toLowerCase() === name);
+  if (!f) return;
+  const set = (i, v) => { const el = document.getElementById(i); if (el) el.value = (v ?? 0); };
+  set('nf-kcal', f.kcal); set('nf-protein', f.protein); set('nf-carbs', f.carbs); set('nf-fat', f.fat);
+}
+
+// Löscht das aktuell im Dropdown gewählte gespeicherte Lebensmittel
+function nutDeleteSelectedFood() {
+  const sel = document.getElementById('nf-saved');
+  const id = sel && sel.value;
+  if (!id) return;
+  const data = loadData();
+  const f = data.nutrition.foods.find(x => x.id === id);
+  if (f && !confirm(`„${f.name}" aus „Meine Lebensmittel" löschen?`)) return;
+  nutDeleteFood(id);   // entfernt + zeichnet das Modal neu
 }
 
 function nutNum(id) { const el = document.getElementById(id); const v = el ? parseFloat(el.value) : NaN; return isNaN(v) ? 0 : Math.max(0, v); }

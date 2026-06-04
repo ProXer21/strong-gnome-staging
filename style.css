@@ -1922,12 +1922,12 @@ select.input-field {
 .modal-x { background: var(--border); border: none; width: 32px; height: 32px; border-radius: 50%; font-size: 14px; cursor: pointer; color: var(--text); }
 .saved-foods-block { margin-bottom: 10px; }
 .sfb-label { font-size: 12px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
-.saved-foods { display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto; }
-.saved-food { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); cursor: pointer; text-align: left; }
-.saved-food:active { border-color: var(--primary); }
-.sf-name { flex: 1; font-weight: 600; font-size: 14px; }
-.sf-kcal { font-size: 13px; color: var(--text-muted); font-weight: 700; }
-.sf-del { color: var(--text-muted); padding: 0 4px; font-size: 13px; }
+.sfb-row { display: flex; gap: 8px; align-items: stretch; }
+.sfb-row .input-field { flex: 1; min-width: 0; }
+.sfb-del { flex: 0 0 auto; width: 46px; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); color: var(--text-muted); cursor: pointer; transition: color .15s, border-color .15s, background .15s; }
+.sfb-del svg { width: 18px; height: 18px; }
+.sfb-del:not(:disabled):active { color: var(--danger); border-color: var(--danger); }
+.sfb-del:disabled { opacity: .4; cursor: default; }
 .modal-divider { text-align: center; margin: 14px 0; position: relative; color: var(--text-muted); font-size: 12px; }
 .modal-divider::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: var(--border); }
 .modal-divider span { background: var(--surface); padding: 0 12px; position: relative; }
