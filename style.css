@@ -1966,19 +1966,21 @@ select.input-field {
 /* abgedunkelter Hintergrund nur bei zentrierten Schritten (ohne Ziel) */
 #tutorial-root.tut-dim .tut-overlay { background: rgba(0,0,0,.72); }
 /* Spotlight: transparentes Loch, Rest abgedunkelt via riesigem Schatten */
-.tut-spotlight { position: fixed; border-radius: 12px; box-shadow: 0 0 0 9999px rgba(0,0,0,.72), 0 0 0 3px var(--primary); transition: all .3s ease; pointer-events: none; }
-/* kompakte Blase */
-.tut-tip { position: fixed; z-index: 9001; box-sizing: border-box; background: var(--surface); color: var(--text); border-radius: 16px; padding: 13px 14px 11px; box-shadow: var(--shadow-lg); border: 1px solid var(--border); animation: tutPop .2s ease; }
-.tut-tip-center { animation: tutPop .2s ease; }
-@keyframes tutPop { from { transform: scale(.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-/* Pfeil aufs Ziel */
-.tut-caret { position: absolute; width: 0; height: 0; transform: translateX(-50%); }
-.tut-caret-up   { top: -9px;    border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 9px solid var(--surface); }
-.tut-caret-down { bottom: -9px; border-left: 9px solid transparent; border-right: 9px solid transparent; border-top: 9px solid var(--surface); }
-.tut-progress { font-size: 11px; font-weight: 800; color: var(--primary); letter-spacing: .02em; margin-bottom: 4px; }
-.tut-tip h4 { margin: 0 0 3px; font-size: 15px; font-weight: 800; color: var(--text); }
-.tut-tip p { margin: 0; font-size: 13px; line-height: 1.45; color: var(--text-muted); }
-.tut-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 11px; gap: 10px; }
+.tut-spotlight { position: fixed; border-radius: 14px; box-shadow: 0 0 0 9999px rgba(0,0,0,.74), 0 0 0 3px var(--primary), 0 0 18px 3px var(--primary); transition: all .3s ease; pointer-events: none; }
+/* runde, weiche Blase */
+.tut-tip { position: fixed; z-index: 9002; box-sizing: border-box; background: var(--surface); color: var(--text); border-radius: 26px; padding: 18px 20px 15px; box-shadow: var(--shadow-lg); border: 1.5px solid var(--primary); animation: tutPop .22s ease; }
+.tut-tip-center { border-radius: 30px; }
+@keyframes tutPop { from { transform: scale(.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+/* langer, geschwungener Pfeil von der Blase zum Ziel */
+.tut-arrow { position: fixed; inset: 0; z-index: 9001; pointer-events: none; overflow: visible; }
+.tut-arrow-line { fill: none; stroke: var(--primary); stroke-width: 3.5; stroke-linecap: round; stroke-dasharray: 1000; stroke-dashoffset: 1000; animation: tutDraw .5s ease forwards; filter: drop-shadow(0 1px 3px rgba(0,0,0,.55)); }
+.tut-arrow-head { fill: none; stroke: var(--primary); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 3px rgba(0,0,0,.55)); opacity: 0; animation: tutFade .25s ease .35s forwards; }
+@keyframes tutDraw { to { stroke-dashoffset: 0; } }
+@keyframes tutFade { to { opacity: 1; } }
+.tut-progress { font-size: 11px; font-weight: 800; color: var(--primary); letter-spacing: .02em; margin-bottom: 5px; }
+.tut-tip h4 { margin: 0 0 5px; font-size: 16px; font-weight: 800; color: var(--text); }
+.tut-tip p { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--text-muted); }
+.tut-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; gap: 10px; }
 .tut-skip { background: none; border: none; color: var(--text-muted); font-size: 13px; font-weight: 600; cursor: pointer; padding: 6px 2px; }
-.tut-next { background: var(--grad-primary); color: #fff; border: none; border-radius: var(--radius-xs); font-weight: 800; font-size: 14px; padding: 9px 20px; cursor: pointer; box-shadow: var(--shadow-primary); }
+.tut-next { background: var(--grad-primary); color: #fff; border: none; border-radius: 999px; font-weight: 800; font-size: 14px; padding: 10px 24px; cursor: pointer; box-shadow: var(--shadow-primary); }
 .tut-next:active { transform: scale(.97); }

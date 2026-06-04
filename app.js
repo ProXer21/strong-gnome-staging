@@ -2830,19 +2830,30 @@ function saveNutGoals() {
 
 // ─── Tutorial / geführte Tour (Coach-Marks) ────────────────────────────────────
 
-// Schritte: target = CSS-Selektor (oder null für zentrierte Box).
+// Schritte: page = welche Seite vorher geöffnet wird, target = CSS-Selektor (null = zentriert).
 const TUTORIAL_STEPS = [
-  { target: null, title: 'Willkommen bei Strong Gnome! 🧙', text: 'In ein paar Sekunden zeige ich dir, wo alles ist. Tippe auf „Weiter".' },
-  { target: '#page-dashboard .card', title: 'Dein Fortschritt', text: 'Hier siehst du dein Gewicht auf dem Weg zum Ziel.' },
-  { target: '#dash-nut', title: 'Heute gegessen', text: 'Deine Kalorien von heute auf einen Blick — tippen für Details.' },
-  { target: 'nav .nav-btn[data-page="nutrition"]', title: 'Essen', text: 'Mahlzeiten & Kalorien eintragen, Tagesziel festlegen.' },
-  { target: 'nav .nav-btn[data-page="training"]', title: 'Training', text: 'Deine Trainingspläne und Workouts starten.' },
-  { target: 'nav .nav-btn[data-page="history"]', title: 'Verlauf', text: 'Alle vergangenen Workouts zum Nachschauen.' },
-  { target: 'nav .nav-btn[data-page="checkin"]', title: 'Check-in', text: 'Gewicht und Körpermaße regelmäßig eintragen.' },
-  { target: 'nav .nav-btn[data-page="stats"]', title: 'Statistik', text: 'Diagramme zu Gewicht, Kraft und Maßen.' },
-  { target: '.icon-btn-badged', title: 'Profil & Freunde', text: 'Einstellungen, Freunde verbinden und Pläne teilen.' },
-  { target: '#skin-toggle', title: 'Design wechseln', text: 'Wechsle jederzeit zwischen Rosé und maskulinem Stil.' },
-  { target: null, title: 'Fertig! 💪', text: 'Das war die Tour. Du findest sie jederzeit wieder im Profil. Viel Erfolg!' },
+  { page: 'dashboard', target: null, title: 'Willkommen bei Strong Gnome! 🧙',
+    text: 'Schön, dass du da bist! Ich führe dich jetzt einmal durch die ganze App und zeige dir Schritt für Schritt, was sie kann und wo du alles findest. Tippe einfach auf „Weiter".' },
+  { page: 'dashboard', target: '#page-dashboard .card', title: 'Dein Gewichtsfortschritt',
+    text: 'Ganz oben siehst du immer dein aktuelles Gewicht, wie viel du schon abgenommen hast und wie weit es noch bis zu deinem Ziel ist. Den Balken füllst du, indem du dich regelmäßig wiegst.' },
+  { page: 'dashboard', target: '#dash-nut', title: 'Deine Kalorien heute',
+    text: 'Diese Karte zeigt dir auf einen Blick, wie viele Kalorien du heute schon gegessen hast und wie viele noch übrig sind. Tippe darauf, um direkt zur Ernährung zu kommen.' },
+  { page: 'nutrition', target: '.nut-summary', title: 'Essen & Kalorien tracken',
+    text: 'Das ist deine Ernährungs-Seite. Der Bogen zeigt deine Kalorien, darunter Eiweiß, Kohlenhydrate und Fett. Mit „+ Hinzufügen" trägst du Mahlzeiten ein, über das Zahnrad oben rechts legst du dein Tagesziel fest.' },
+  { page: 'training', target: '#routine-list .routine-card', title: 'Training & Workouts',
+    text: 'Hier sind deine Trainingspläne. Tippe einen Plan an, um ein Workout zu starten — dann trägst du Gewicht, Wiederholungen und Sätze ein. Pläne kannst du frei anpassen oder neue anlegen.' },
+  { page: 'history', target: '#page-history .page-header', title: 'Dein Verlauf',
+    text: 'Im Verlauf findest du alle deine abgeschlossenen Workouts. Tippe ein Workout an, um Details, dein Volumen und neue Bestleistungen zu sehen.' },
+  { page: 'checkin', target: '#page-checkin .page-header', title: 'Einchecken',
+    text: 'Hier trägst du regelmäßig dein Gewicht und deine Körpermaße ein. Wie oft, kannst du selbst wählen (täglich, wöchentlich oder monatlich) — so verfolgst du deinen Fortschritt genau.' },
+  { page: 'stats', target: '#page-stats .page-header', title: 'Deine Statistik',
+    text: 'Übersichtliche Diagramme zeigen dir, wie sich Gewicht, Kraft und Maße über die Zeit entwickeln. So siehst du schwarz auf weiß, dass sich deine Arbeit lohnt.' },
+  { page: 'dashboard', target: '.icon-btn-badged', title: 'Profil & Freunde',
+    text: 'Über dieses Symbol kommst du zu deinem Profil: Ziele ändern, dich mit Freunden verbinden, Trainingspläne teilen — und diese Tour jederzeit erneut starten.' },
+  { page: 'dashboard', target: '#skin-toggle', title: 'Design wechseln',
+    text: 'Mit dem Blitz wechselst du zwischen dem hellen, rosé Design und dem dunklen, maskulinen Stil — ganz wie es dir gefällt.' },
+  { page: 'dashboard', target: null, title: 'Fertig — viel Erfolg! 💪',
+    text: 'Das war die Tour! Du kannst sie jederzeit im Profil unter „App-Tour" erneut starten. Jetzt kann es losgehen mit Strong Gnome.' },
 ];
 let tutorialIdx = 0;
 
@@ -2865,10 +2876,14 @@ function tutorialRender() {
   if (!root) return;
   const step = TUTORIAL_STEPS[tutorialIdx];
   const last = tutorialIdx === TUTORIAL_STEPS.length - 1;
+
+  // den passenden Reiter tatsächlich öffnen
+  if (step.page) navigate(step.page);
+
   const targetEl = step.target ? document.querySelector(step.target) : null;
   if (targetEl) targetEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
 
-  // nach evtl. Scrollen Positionen messen
+  // nach Navigation/Scrollen Positionen messen
   setTimeout(() => {
     const rect = targetEl ? targetEl.getBoundingClientRect() : null;
     const vw = window.innerWidth, vh = window.innerHeight;
@@ -2878,32 +2893,27 @@ function tutorialRender() {
       spot = `<div class="tut-spotlight" style="left:${rect.left - pad}px;top:${rect.top - pad}px;width:${rect.width + pad * 2}px;height:${rect.height + pad * 2}px"></div>`;
     }
 
-    // kompakte Blase, mittig über dem Ziel (geklemmt), mit Pfeil aufs Ziel
-    let centered = false, caret = '', tipStyle = '';
+    // runde Blase, mit großzügigem Abstand zum Ziel (Platz für den langen, geschwungenen Pfeil)
+    let centered = false, tipStyle = '', below = false;
+    const gap = 72;
     if (!rect) {
       centered = true;
-      tipStyle = `width:${Math.min(300, vw - 32)}px;left:50%;top:50%;transform:translate(-50%,-50%);`;
+      tipStyle = `width:${Math.min(320, vw - 32)}px;left:50%;top:50%;transform:translate(-50%,-50%);`;
     } else {
-      const tipW = Math.min(280, vw - 24);
+      const tipW = Math.min(290, vw - 24);
       let left = rect.left + rect.width / 2 - tipW / 2;
       left = Math.max(12, Math.min(left, vw - tipW - 12));
-      const caretX = Math.max(18, Math.min(rect.left + rect.width / 2 - left, tipW - 18));
-      const below = rect.top < vh / 2;   // Ziel oben → Blase darunter
-      if (below) {
-        tipStyle = `width:${tipW}px;left:${left}px;top:${rect.bottom + 14}px;`;
-        caret = `<span class="tut-caret tut-caret-up" style="left:${caretX}px"></span>`;
-      } else {
-        tipStyle = `width:${tipW}px;left:${left}px;bottom:${vh - rect.top + 14}px;`;
-        caret = `<span class="tut-caret tut-caret-down" style="left:${caretX}px"></span>`;
-      }
+      below = rect.top < vh / 2;   // Ziel oben → Blase darunter
+      if (below) tipStyle = `width:${tipW}px;left:${left}px;top:${Math.min(rect.bottom + gap, vh - 220)}px;`;
+      else       tipStyle = `width:${tipW}px;left:${left}px;bottom:${Math.min(vh - rect.top + gap, vh - 200)}px;`;
     }
 
     root.className = 'tut-on' + (rect ? '' : ' tut-dim');
     root.innerHTML = `
       <div class="tut-overlay" onclick="tutorialNext()">
         ${spot}
+        ${rect ? '<svg class="tut-arrow" id="tut-arrow" aria-hidden="true"></svg>' : ''}
         <div class="tut-tip ${centered ? 'tut-tip-center' : ''}" style="${tipStyle}" onclick="event.stopPropagation()">
-          ${caret}
           <div class="tut-progress">Schritt ${tutorialIdx + 1} von ${TUTORIAL_STEPS.length}</div>
           <h4>${escapeHtml(step.title)}</h4>
           <p>${escapeHtml(step.text)}</p>
@@ -2913,7 +2923,43 @@ function tutorialRender() {
           </div>
         </div>
       </div>`;
-  }, targetEl ? 280 : 0);
+
+    // geschwungenen Pfeil von der Blase zum Ziel zeichnen (getBoundingClientRect erzwingt Layout → synchron ok)
+    if (rect) tutorialDrawArrow(rect, below, vw, vh);
+  }, step.page || targetEl ? 320 : 0);
+}
+
+// Zeichnet einen langen, geschwungenen Pfeil von der Blasenkante zum Ziel.
+function tutorialDrawArrow(targetRect, below, vw, vh) {
+  const svg = document.getElementById('tut-arrow');
+  const tip = document.querySelector('.tut-tip');
+  if (!svg || !tip) return;
+  const t = tip.getBoundingClientRect();
+  const tgtX = targetRect.left + targetRect.width / 2;
+
+  // Start an der Blasenkante (Richtung Ziel), Ende kurz vor dem Ziel
+  let fromX = Math.min(Math.max(tgtX, t.left + 24), t.right - 24);
+  let fromY, toX = tgtX, toY;
+  if (below) { fromY = t.top - 2; toY = targetRect.bottom + 8; }      // Blase unter Ziel → Pfeil nach oben
+  else       { fromY = t.bottom + 2; toY = targetRect.top - 8; }      // Blase über Ziel → Pfeil nach unten
+
+  // geschwungene Kurve (Kontrollpunkt seitlich versetzt)
+  const dist = Math.abs(toY - fromY);
+  const side = (fromX >= tgtX ? 1 : -1);
+  const cx = (fromX + toX) / 2 + side * Math.max(34, Math.min(85, dist * 0.7));
+  const cy = (fromY + toY) / 2;
+
+  // Pfeilspitze
+  const ang = Math.atan2(toY - cy, toX - cx);
+  const hl = 13, spread = 0.45;
+  const aLx = toX - hl * Math.cos(ang - spread), aLy = toY - hl * Math.sin(ang - spread);
+  const aRx = toX - hl * Math.cos(ang + spread), aRy = toY - hl * Math.sin(ang + spread);
+
+  svg.setAttribute('viewBox', `0 0 ${vw} ${vh}`);
+  svg.setAttribute('width', vw); svg.setAttribute('height', vh);
+  svg.innerHTML = `
+    <path d="M${fromX} ${fromY} Q ${cx} ${cy} ${toX} ${toY}" class="tut-arrow-line"/>
+    <path d="M${toX} ${toY} L ${aLx} ${aLy} M${toX} ${toY} L ${aRx} ${aRy}" class="tut-arrow-head"/>`;
 }
 
 function tutorialNext() {
