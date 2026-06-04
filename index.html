@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Strong Gnome" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="application-name" content="Strong Gnome" />
+  <meta name="theme-color" content="#fdf6fb" />
+  <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png" />
+  <title>Strong Gnome</title>
+  <script>
+    /* Theme vor dem Paint setzen — kein Flackern */
+    (function () {
+      try {
+        var t = localStorage.getItem('themePref');
+        if (['light','dark','masc'].indexOf(t) < 0) {
+          var d = JSON.parse(localStorage.getItem('fitnessData') || '{}');
+          t = (d.settings && d.settings.theme) ||
+              (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        }
+        document.documentElement.setAttribute('data-theme', t);
+        var m = document.querySelector('meta[name="theme-color"]');
+        if (m) m.setAttribute('content', t === 'masc' ? '#07090d' : t === 'dark' ? '#16121b' : '#fdf6fb');
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
+  <link rel="stylesheet" href="./style.css?v=30" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script src="./firebase-config.js"></script>
+  <style>
+    /* Staging-Kennzeichnung */
+    #staging-ribbon{position:fixed;top:0;left:0;right:0;z-index:9999;background:repeating-linear-gradient(45deg,#c46a04,#c46a04 12px,#a85a00 12px,#a85a00 24px);color:#fff;font:700 12px/1 'Plus Jakarta Sans',system-ui,sans-serif;letter-spacing:.08em;text-align:center;padding:5px 8px;text-transform:uppercase;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+    body{padding-top:26px}
+  </style>
+</head>
+<body data-state="loading">
+
+<div id="staging-ribbon">⚠ Testversion — nicht die echte App</div>
+
+<!-- ─── Toast ─────────────────────────────────────────────────────────── -->
+<div id="toast" class="toast"></div>
+
+<!-- ─── Ladezustand ───────────────────────────────────────────────────── -->
+<div id="loading-screen"><img src="./logo.png" class="loading-logo" alt="Strong Gnome" /><div class="spinner"></div></div>
+
+<!-- ─── Login / Registrieren ──────────────────────────────────────────── -->
+<div id="auth-screen">
+  <div class="auth-card">
+
+    <!-- Ansicht: Anmelden -->
+    <div id="auth-login">
+      <img src="./logo.png" class="auth-logo-img" alt="Strong Gnome Logo" />
+      <h1 class="auth-title">Strong Gnome</h1>
+      <p class="auth-sub">Schön, dass du da bist</p>
+      <label class="auth-label">E-Mail</label>
+      <input id="login-email" class="modal-input" type="email" inputmode="email" autocomplete="email" placeholder="du@beispiel.de" />
+      <label class="auth-label">Passwort</label>
+      <div class="pw-wrap">
+        <input id="login-pw" class="modal-input" type="password" autocomplete="current-password" placeholder="••••••••" />
+        <button type="button" class="pw-eye" aria-label="Passwort anzeigen" onclick="togglePw('login-pw', this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      </div>
+      <button class="save-workout-btn" onclick="signIn()">Anmelden</button>
+      <button class="auth-reset" onclick="resetPassword()">Passwort vergessen?</button>
+      <div class="auth-divider"><span>oder</span></div>
+      <button class="btn-google" onclick="signInWithGoogle()">
+        <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.4 29.3 35 24 35c-6.1 0-11-4.9-11-11s4.9-11 11-11c2.8 0 5.4 1.1 7.3 2.9l5.7-5.7C33.6 6.2 29 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c2.8 0 5.4 1.1 7.3 2.9l5.7-5.7C33.6 6.2 29 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.3 0-9.7-3.4-11.3-8.1l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.6l6.2 5.2C39.9 36.6 44 31 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg>
+        <span>Mit Google anmelden</span>
+      </button>
+      <p class="auth-switch">Noch kein Konto? <button onclick="authMode('register')">Konto erstellen</button></p>
+    </div>
+
+    <!-- Ansicht: Konto erstellen -->
+    <div id="auth-register" style="display:none">
+      <button class="auth-back" onclick="authMode('login')">‹ Zurück</button>
+      <div class="auth-logo">🎯</div>
+      <h1 class="auth-title">Konto erstellen</h1>
+      <p class="auth-sub">Erstelle dein Strong-Gnome-Konto</p>
+      <label class="auth-label">E-Mail</label>
+      <input id="reg-email" class="modal-input" type="email" inputmode="email" autocomplete="email" placeholder="du@beispiel.de" />
+      <label class="auth-label">Passwort</label>
+      <div class="pw-wrap">
+        <input id="reg-pw" class="modal-input" type="password" autocomplete="new-password" placeholder="mind. 6 Zeichen" />
+        <button type="button" class="pw-eye" aria-label="Passwort anzeigen" onclick="togglePw('reg-pw', this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      </div>
+      <label class="auth-label">Passwort bestätigen</label>
+      <div class="pw-wrap">
+        <input id="reg-pw2" class="modal-input" type="password" autocomplete="new-password" placeholder="••••••••" />
+        <button type="button" class="pw-eye" aria-label="Passwort anzeigen" onclick="togglePw('reg-pw2', this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      </div>
+      <button class="save-workout-btn" onclick="signUp()">Konto erstellen</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ─── Onboarding (Profil anlegen) ───────────────────────────────────── -->
+<div id="onboarding">
+  <div class="auth-card">
+    <div class="auth-logo">🎯</div>
+    <h1 class="auth-title">Dein Profil</h1>
+    <p class="auth-sub">Damit wir deinen Fortschritt richtig berechnen</p>
+    <label class="auth-label">Name</label>
+    <input id="ob-name" class="modal-input" type="text" autocomplete="name" placeholder="Dein Name" />
+    <div class="ob-row">
+      <div>
+        <label class="auth-label">Startgewicht (kg)</label>
+        <input id="ob-start" class="modal-input" type="number" inputmode="decimal" step="0.1" placeholder="82" />
+      </div>
+      <div>
+        <label class="auth-label">Zielgewicht (kg)</label>
+        <input id="ob-goal" class="modal-input" type="number" inputmode="decimal" step="0.1" placeholder="70" />
+      </div>
+    </div>
+    <label class="auth-label">Zieldatum</label>
+    <input id="ob-date" class="modal-input" type="date" />
+
+    <label class="auth-label">Dein Design</label>
+    <div class="design-pick">
+      <button type="button" class="design-opt sel" data-design="light" onclick="pickDesign('light')">
+        <span class="dp-swatch dp-rose"></span>
+        <span class="dp-name">Rosé</span>
+        <span class="dp-desc">hell &amp; feminin</span>
+      </button>
+      <button type="button" class="design-opt" data-design="masc" onclick="pickDesign('masc')">
+        <span class="dp-swatch dp-masc"></span>
+        <span class="dp-name">Maskulin</span>
+        <span class="dp-desc">düster &amp; schwer</span>
+      </button>
+    </div>
+    <p class="design-hint">Du kannst das jederzeit oben rechts umschalten.</p>
+
+    <button class="save-workout-btn" onclick="saveOnboarding()">Los geht's 💪</button>
+  </div>
+</div>
+
+<!-- ─── Electric-Border SVG-Filter (Blitz um den Button) ───────────────── -->
+<svg class="elec-defs" aria-hidden="true" focusable="false" width="0" height="0">
+  <defs>
+    <filter id="electric" x="-60%" y="-60%" width="220%" height="220%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.011 0.055" numOctaves="2" seed="1" result="noise">
+        <animate attributeName="seed" dur="0.45s" values="1;4;7;10;13;16;19" repeatCount="indefinite" calcMode="discrete" />
+      </feTurbulence>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="26" xChannelSelector="R" yChannelSelector="G" />
+    </filter>
+  </defs>
+</svg>
+
+<!-- ─── Alternative Modal ─────────────────────────────────────────────── -->
+<div id="alt-modal" class="modal-overlay" onclick="if(event.target===this)closeAltModal()">
+  <div class="modal">
+    <h3>Übung nicht machbar?</h3>
+    <p>Wähle eine Alternative für <strong id="alt-ex-name"></strong> oder überspringe sie komplett.</p>
+    <div class="alt-options" id="alt-options"></div>
+    <button class="btn-skip-all" onclick="skipExercise()">Übung komplett auslassen</button>
+  </div>
+</div>
+
+<!-- ─── Übung hinzufügen Modal ─────────────────────────────────────────── -->
+<div id="ex-modal" class="modal-overlay" onclick="if(event.target===this)closeExModal()">
+  <div class="modal">
+    <h3>Übung hinzufügen</h3>
+    <p>Suche eine bekannte Übung oder gib eine neue ein.</p>
+    <input id="ex-input" class="modal-input" list="ex-datalist" placeholder="z. B. Hip Thrust" autocomplete="off" />
+    <datalist id="ex-datalist"></datalist>
+    <div class="modal-fields">
+      <label>Sätze<input type="number" id="ex-sets" min="1" max="10" value="3" inputmode="numeric"></label>
+      <label>Wdh von<input type="number" id="ex-rmin" min="1" max="50" value="10" inputmode="numeric"></label>
+      <label>bis<input type="number" id="ex-rmax" min="1" max="50" value="12" inputmode="numeric"></label>
+    </div>
+    <button class="save-workout-btn" onclick="confirmAddExercise()">Hinzufügen</button>
+  </div>
+</div>
+
+<!-- ─── Übungs-Menü (…) ────────────────────────────────────────────────── -->
+<div id="exmenu-modal" class="modal-overlay" onclick="if(event.target===this)closeExMenu()">
+  <div class="modal">
+    <h3 id="exmenu-title">Übung</h3>
+    <div class="menu-list">
+      <button class="menu-item" onclick="menuReplace()">🔁 Übung ersetzen</button>
+      <button class="menu-item" onclick="menuAlternative()">↔️ Alternative wählen</button>
+      <button class="menu-item" onclick="menuRest()">⏱️ Pausenzeit ändern</button>
+      <button class="menu-item" onclick="menuNote()">📝 Notiz hinzufügen</button>
+      <button class="menu-item danger" onclick="menuRemove()">🗑️ Übung entfernen</button>
+    </div>
+    <button class="btn-skip-all" onclick="closeExMenu()">Abbrechen</button>
+  </div>
+</div>
+
+<!-- ─── Pausenzeit-Auswahl ─────────────────────────────────────────────── -->
+<div id="rest-sheet" class="modal-overlay" onclick="if(event.target===this)closeRestSheet()">
+  <div class="modal">
+    <h3 id="rest-sheet-title">Pausenzeit</h3>
+    <p>Wie lange Pause nach jedem Satz?</p>
+    <div class="rest-opts">
+      <button class="rest-opt" data-sec="0"   onclick="setExerciseRest(0)">Aus</button>
+      <button class="rest-opt" data-sec="30"  onclick="setExerciseRest(30)">0:30</button>
+      <button class="rest-opt" data-sec="60"  onclick="setExerciseRest(60)">1:00</button>
+      <button class="rest-opt" data-sec="90"  onclick="setExerciseRest(90)">1:30</button>
+      <button class="rest-opt" data-sec="120" onclick="setExerciseRest(120)">2:00</button>
+      <button class="rest-opt" data-sec="150" onclick="setExerciseRest(150)">2:30</button>
+      <button class="rest-opt" data-sec="180" onclick="setExerciseRest(180)">3:00</button>
+      <button class="rest-opt" data-sec="240" onclick="setExerciseRest(240)">4:00</button>
+    </div>
+    <button class="btn-skip-all" onclick="closeRestSheet()">Abbrechen</button>
+  </div>
+</div>
+
+<!-- ─── Rest-Timer ─────────────────────────────────────────────────────── -->
+<div id="rest-timer" class="rest-timer">
+  <span class="rt-label">Pause</span>
+  <button class="rt-adj" onclick="adjustRest(-15)">−15</button>
+  <span class="rt-time" id="rest-time">1:30</span>
+  <button class="rt-adj" onclick="adjustRest(15)">+15</button>
+  <button class="rt-skip" onclick="skipRest()">Überspringen</button>
+</div>
+
+<!-- ─── Workout-Start (Bereit?) ────────────────────────────────────────── -->
+<div id="workout-intro" class="intro-overlay">
+  <div class="intro-card">
+    <div class="intro-emoji" id="intro-emoji">🍑</div>
+    <div class="intro-label">Bereit für</div>
+    <h2 id="intro-name">Trainingsplan</h2>
+    <div class="intro-meta" id="intro-meta">5 Übungen</div>
+    <div class="elec-wrap">
+      <span class="elec-border" aria-hidden="true"></span>
+      <span class="elec-border elec-2" aria-hidden="true"></span>
+      <button class="intro-go" onclick="beginWorkout()">Los geht's 💪</button>
+    </div>
+    <button class="intro-cancel" onclick="cancelIntro()">Zurück</button>
+  </div>
+</div>
+
+<!-- ─── 3·2·1 Countdown ────────────────────────────────────────────────── -->
+<div id="countdown" class="countdown">
+  <div class="cd-glow"></div>
+  <div class="cd-ring"></div>
+  <span id="countdown-num">3</span>
+  <div class="cd-flash"></div>
+</div>
+
+<!-- ─── Dashboard ─────────────────────────────────────────────────────── -->
+<section id="page-dashboard" class="page active">
+  <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start">
+    <div>
+      <h1>Hallo!</h1>
+      <p id="weekly-target">Lade…</p>
+    </div>
+    <div class="header-actions">
+      <button id="skin-toggle" class="icon-btn" aria-label="Maskulinen Stil aktivieren"></button>
+      <button id="theme-toggle" class="icon-btn" aria-label="Hell/Dunkel umschalten"></button>
+      <button class="icon-btn icon-btn-badged" aria-label="Profil & Einstellungen" onclick="navigate('profile')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+        <span class="social-badge social-badge-dot" style="display:none">0</span>
+      </button>
+      <span id="sync-status" title="Cloud-Sync"></span>
+    </div>
+  </div>
+
+  <!-- Weight progress -->
+  <div class="card">
+    <div class="card-title">Gewichtsfortschritt</div>
+    <div style="display:flex;align-items:baseline;gap:8px">
+      <h2><span id="current-weight">82.0</span> <span>kg</span></h2>
+      <span style="font-size:14px;color:var(--mint);font-weight:800" id="weight-lost"></span>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+    </div>
+    <div class="progress-label">
+      <span id="progress-start">82 kg</span>
+      <span id="progress-pct" style="color:var(--primary);font-weight:800">0%</span>
+      <span id="progress-goal">70 kg</span>
+    </div>
+  </div>
+
+  <!-- Stats row -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-value" id="weeks-left">—</div>
+      <div class="stat-label">Wochen bis Ziel</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="goal-weight-stat">70</div>
+      <div class="stat-label">Zielgewicht (kg)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="goal-month-stat">Sep</div>
+      <div class="stat-label">Zielmonat</div>
+    </div>
+  </div>
+
+  <!-- Next workout -->
+  <div class="next-workout">
+    <div class="nw-label">Nächstes Training</div>
+    <h3 id="nw-title">Tag A — Glutes & Beine I</h3>
+    <div class="nw-exercises" id="nw-exercises"></div>
+  </div>
+
+  <button class="save-workout-btn" onclick="navigate('training')">
+    Training starten →
+  </button>
+
+  <!-- Heute gegessen -->
+  <div class="card dash-nut-card" id="dash-nut" role="button" onclick="navigate('nutrition')">
+    <div class="dnc-head">
+      <span class="card-title">Heute gegessen</span>
+      <span class="dnc-link">Details →</span>
+    </div>
+    <div class="dnc-row">
+      <h2><span id="dn-kcal">0</span> <span class="dnc-unit">/ <span id="dn-goal">2000</span> kcal</span></h2>
+      <span class="dnc-rem" id="dn-rem">2000 kcal übrig</span>
+    </div>
+    <div class="progress-wrap"><div class="progress-bar" id="dn-bar" style="width:0%"></div></div>
+  </div>
+
+  <div class="app-version">Strong Gnome</div>
+</section>
+
+<!-- ─── Training ──────────────────────────────────────────────────────── -->
+<section id="page-training" class="page">
+
+  <!-- Ansicht 1: Routinen-Liste -->
+  <div id="tv-list">
+    <div class="page-header">
+      <h1>Trainingspläne</h1>
+      <p>Wähle einen Trainingsplan zum Starten oder Bearbeiten</p>
+    </div>
+    <button class="btn-quickstart" onclick="startEmptyWorkout()">⚡ Leeres Workout starten</button>
+    <div class="section-label">Meine Trainingspläne</div>
+    <div id="routine-list"></div>
+    <button class="btn-add-ex" onclick="createRoutine()">+ Neuer Trainingsplan</button>
+  </div>
+
+  <!-- Ansicht 2: Routine-Editor -->
+  <div id="tv-editor" style="display:none">
+    <div class="editor-bar">
+      <button class="btn-back" onclick="showTrainingView('list')" aria-label="Zurück">‹ Pläne</button>
+      <h2 id="editor-title">Routine</h2>
+      <button class="btn-icon-text" onclick="renameRoutine()" aria-label="Umbenennen">✎</button>
+    </div>
+    <div id="editor-body"></div>
+    <div class="editor-footer">
+      <button class="btn-secondary" onclick="duplicateRoutine()">Duplizieren</button>
+      <button class="btn-danger" onclick="deleteRoutine()">Routine löschen</button>
+    </div>
+  </div>
+
+  <!-- Ansicht 3: Aktives Workout -->
+  <div id="tv-workout" style="display:none">
+    <div class="workout-bar">
+      <button class="btn-back" onclick="cancelWorkout()" aria-label="Abbrechen">✕</button>
+      <div class="wb-center">
+        <div class="wb-title" id="wb-title">Training</div>
+        <div class="wb-timer" id="wb-timer">0:00</div>
+      </div>
+      <button class="wb-finish" onclick="finishWorkout()">Fertig</button>
+    </div>
+    <div id="workout-body"></div>
+    <button class="save-workout-btn" onclick="finishWorkout()">Training abschließen &amp; speichern</button>
+  </div>
+</section>
+
+<!-- ─── Check-in ──────────────────────────────────────────────────────── -->
+<section id="page-checkin" class="page">
+  <div class="page-header">
+    <h1>Einchecken</h1>
+    <p>Deine Werte eintragen</p>
+  </div>
+
+  <div class="info-box" id="checkin-hint">
+    📅 <strong>Gewicht:</strong> einmal pro Woche, morgens nüchtern.<br>
+    📏 <strong>Maße:</strong> einmal im Monat — immer an der gleichen Stelle.
+  </div>
+
+  <div class="checkin-section">
+    <div class="ci-head">
+      <h2 id="ci-weight-head">⚖️ Gewicht (wöchentlich)</h2>
+      <div class="freq-seg" id="freq-weight"></div>
+    </div>
+    <div class="input-row">
+      <div class="input-field">
+        <label>Aktuelles Gewicht</label>
+        <input type="number" id="ci-weight" inputmode="decimal" step="0.01" min="30" max="250" placeholder="—" />
+        <span class="unit">kg</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="checkin-section">
+    <div class="ci-head">
+      <h2 id="ci-measure-head">📏 Körpermaße (monatlich)</h2>
+      <div class="freq-seg" id="freq-measure"></div>
+    </div>
+    <div class="input-row" id="measure-inputs"></div>
+  </div>
+
+  <button class="btn-save-checkin" onclick="saveCheckin()">Werte speichern</button>
+
+  <div class="app-version">Strong Gnome</div>
+</section>
+
+<!-- ─── Statistiken ───────────────────────────────────────────────────── -->
+<section id="page-stats" class="page">
+  <div class="page-header">
+    <h1>Statistiken</h1>
+    <p>Dein Fortschritt auf einen Blick</p>
+  </div>
+
+  <div class="chart-selector">
+    <button class="chart-btn active" data-chart="weight">Gewicht</button>
+    <button class="chart-btn" data-chart="measures">Maße</button>
+    <button class="chart-btn" data-chart="strength">Kraft</button>
+    <button class="chart-btn" data-chart="heatmap">Konsistenz</button>
+    <button class="chart-btn" data-chart="volume">Volumen</button>
+    <button class="chart-btn" data-chart="month">Monatscheck</button>
+  </div>
+
+  <!-- Weight chart -->
+  <div id="chart-weight" class="chart-view">
+    <div class="chart-container">
+      <h3>⚖️ Gewichtsverlauf vs. Zielkurve</h3>
+      <canvas id="canvas-weight" height="200"></canvas>
+    </div>
+  </div>
+
+  <!-- Measures chart -->
+  <div id="chart-measures" class="chart-view" style="display:none">
+    <div class="chart-container">
+      <h3>📏 Körpermaße im Verlauf</h3>
+      <canvas id="canvas-measures" height="200"></canvas>
+    </div>
+  </div>
+
+  <!-- Strength chart -->
+  <div id="chart-strength" class="chart-view" style="display:none">
+    <div class="chart-container">
+      <h3>💪 Kraftentwicklung</h3>
+      <div class="exercise-picker">
+        <label>Übung:</label>
+        <select id="ex-picker"></select>
+      </div>
+      <canvas id="canvas-strength" height="200"></canvas>
+    </div>
+  </div>
+
+  <!-- Heatmap -->
+  <div id="chart-heatmap" class="chart-view" style="display:none">
+    <div class="chart-container">
+      <h3>🔥 Trainings-Konsistenz</h3>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Pink = Trainingstag</p>
+      <div class="heatmap" id="heatmap-grid"></div>
+    </div>
+  </div>
+
+  <!-- Volume chart -->
+  <div id="chart-volume" class="chart-view" style="display:none">
+    <div class="chart-container">
+      <h3>📈 Wöchentliches Trainingsvolumen</h3>
+      <canvas id="canvas-volume" height="200"></canvas>
+    </div>
+  </div>
+
+  <!-- Month summary -->
+  <div id="chart-month" class="chart-view" style="display:none">
+    <div class="chart-container mb-0">
+      <h3>🗓️ Monatscheck — Wie lief es?</h3>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px">🟢 = Ziel erreicht · 🟡 = Nah dran · 🔴 = Anpassen</p>
+      <div class="month-summary" id="month-summary-grid">
+        <div class="empty-state" style="grid-column:1/-1">
+          <div class="es-icon">📊</div>
+          <p>Noch zu wenig Daten für diesen Monat</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── Verlauf ───────────────────────────────────────────────────────── -->
+<section id="page-history" class="page">
+  <div class="page-header">
+    <h1>Verlauf</h1>
+    <p>Deine vergangenen Workouts</p>
+  </div>
+  <div id="history-list"></div>
+</section>
+
+<!-- ─── Profil & Einstellungen ────────────────────────────────────────── -->
+<section id="page-profile" class="page">
+  <div class="editor-bar">
+    <button class="btn-back" onclick="navigate('dashboard')" aria-label="Zurück">‹ Start</button>
+    <h2>Profil</h2>
+    <span style="width:40px"></span>
+  </div>
+
+  <!-- Profilkopf -->
+  <div class="profile-head">
+    <div class="profile-avatar" id="profile-avatar">🙂</div>
+    <div>
+      <div class="profile-name" id="profile-name">—</div>
+      <div class="profile-email" id="profile-email">—</div>
+    </div>
+  </div>
+
+  <!-- Persönliche Daten -->
+  <div class="checkin-section">
+    <h2>👤 Persönliche Daten</h2>
+    <div class="input-row">
+      <div class="input-field"><label>Name</label>
+        <input type="text" id="pf-name" placeholder="Dein Name" style="width:auto;flex:1;text-align:left" /></div>
+      <div class="input-field"><label>Startgewicht</label>
+        <input type="number" id="pf-start" inputmode="decimal" step="0.01" min="30" max="250" /><span class="unit">kg</span></div>
+      <div class="input-field"><label>Zielgewicht</label>
+        <input type="number" id="pf-goal" inputmode="decimal" step="0.01" min="30" max="250" /><span class="unit">kg</span></div>
+      <div class="input-field"><label>Startdatum</label>
+        <input type="date" id="pf-startdate" style="width:auto;flex:1;text-align:left" /></div>
+      <div class="input-field"><label>Zieldatum</label>
+        <input type="date" id="pf-goaldate" style="width:auto;flex:1;text-align:left" /></div>
+    </div>
+    <button class="btn-save-checkin" style="margin-top:14px" onclick="saveProfile()">Speichern</button>
+  </div>
+
+  <!-- Design -->
+  <div class="checkin-section">
+    <h2>🎨 Design</h2>
+    <div class="design-pick" id="pf-design"></div>
+  </div>
+
+  <!-- Training -->
+  <div class="checkin-section">
+    <div class="ci-head">
+      <h2>⏱️ Standard-Pausenzeit</h2>
+      <div class="freq-seg" id="pf-rest"></div>
+    </div>
+    <p class="design-hint" style="text-align:left;margin:0">Voreingestellte Pause zwischen den Sätzen für neue Übungen.</p>
+  </div>
+
+  <!-- Freunde -->
+  <div class="checkin-section">
+    <h2>🤝 Freunde</h2>
+    <div class="friend-code-box">
+      <span id="pf-friendcode" class="friend-code">—</span>
+      <button class="btn-secondary" style="width:auto;padding:10px 16px" onclick="copyFriendCode()">Kopieren</button>
+    </div>
+    <button class="save-workout-btn" style="margin-top:12px" onclick="navigate('friends')">
+      Freunde verwalten <span class="social-badge" style="display:none">0</span>
+    </button>
+    <p class="design-hint" style="text-align:left;margin:8px 0 0">Verbinde dich per Code, sieh das letzte Training deiner Freunde und teile Trainingspläne.</p>
+  </div>
+
+  <!-- Daten -->
+  <div class="checkin-section">
+    <h2>💾 Daten</h2>
+    <div class="setup-card">
+      <h3>📤 Exportieren</h3>
+      <p>Sichere deine Daten als JSON-Datei.</p>
+      <button class="btn-secondary" onclick="exportData()">Als JSON exportieren</button>
+    </div>
+    <div class="setup-card">
+      <h3>📥 Importieren</h3>
+      <p>Lade eine gespeicherte JSON-Datei wieder ein.</p>
+      <button class="btn-secondary" onclick="document.getElementById('import-file').click()">JSON importieren</button>
+      <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(this.files[0])" />
+    </div>
+  </div>
+
+  <!-- Konto -->
+  <div class="checkin-section" id="account-section">
+    <h2>🔑 Konto</h2>
+    <div class="setup-card">
+      <p>Angemeldet als <strong id="account-email">—</strong></p>
+      <button class="btn-danger" onclick="signOutUser()">Abmelden</button>
+    </div>
+    <div class="setup-card">
+      <h3>♻️ Konto zurücksetzen</h3>
+      <p>Löscht alle Daten dieses Kontos (Trainings, Gewicht, Maße, Pläne) und richtet es neu ein. Freunde bleiben.</p>
+      <button class="btn-danger" onclick="resetAccountData()">Daten zurücksetzen</button>
+    </div>
+  </div>
+
+  <div class="app-version">Strong Gnome</div>
+</section>
+
+<!-- ─── Workout-Detail (Verlauf-Karte antippen) ───────────────────────── -->
+<section id="page-workout-detail" class="page">
+  <div class="editor-bar">
+    <button class="btn-back" onclick="navigate('history')" aria-label="Zurück">‹ Verlauf</button>
+    <h2>Training</h2>
+    <button class="hist-del" onclick="deleteWorkoutFromDetail()" aria-label="Löschen">✕</button>
+  </div>
+  <div id="wd-body"></div>
+  <button class="save-workout-btn" onclick="repeatCurrentWorkout()">🔁 Erneut ausführen</button>
+</section>
+
+<!-- ─── Freunde (Social) ──────────────────────────────────────────────── -->
+<section id="page-friends" class="page">
+  <div class="editor-bar">
+    <button class="btn-back" onclick="navigate('profile')" aria-label="Zurück">‹ Profil</button>
+    <h2>Freunde</h2>
+    <button class="btn-icon-text" onclick="renderFriends()" aria-label="Aktualisieren">⟳</button>
+  </div>
+
+  <!-- Verbinden -->
+  <div class="checkin-section">
+    <h2>🔗 Verbinden</h2>
+    <p class="design-hint" style="text-align:left;margin:0 0 10px">Dein Code: <strong id="fr-mycode" class="friend-code-inline">—</strong></p>
+    <div class="connect-row">
+      <input type="text" id="friend-code-input" class="modal-input" placeholder="Code des Freundes (z. B. ABC-123)" autocomplete="off" style="margin-bottom:0" />
+      <button class="btn-secondary" style="width:auto;padding:12px 18px" onclick="sendFriendByCode()">Hinzufügen</button>
+    </div>
+  </div>
+
+  <div id="friends-body"></div>
+</section>
+
+<!-- ─── Gruppentraining (Live-Session) ────────────────────────────────── -->
+<section id="page-group" class="page">
+  <div class="workout-bar">
+    <button class="btn-back" onclick="leaveGroupSession()" aria-label="Verlassen">✕</button>
+    <div class="wb-center">
+      <div class="wb-title" id="grp-title">Gruppentraining</div>
+      <div class="wb-timer" id="grp-sub">—</div>
+    </div>
+    <button class="wb-finish" onclick="finishGroupSession()">Fertig</button>
+  </div>
+  <div id="group-body"></div>
+  <button class="save-workout-btn" onclick="finishGroupSession()">Mein Training speichern &amp; beenden</button>
+</section>
+
+<!-- ─── Gruppentraining: Plan wählen ──────────────────────────────────── -->
+<div id="group-plan-modal" class="modal-overlay" onclick="if(event.target===this)closeGroupPlanModal()">
+  <div class="modal">
+    <h3 id="gpm-title">Gemeinsam trainieren</h3>
+    <p>Welchen Trainingsplan wollt ihr zusammen machen?</p>
+    <div class="menu-list" id="gpm-plans"></div>
+    <button class="btn-skip-all" onclick="closeGroupPlanModal()">Abbrechen</button>
+  </div>
+</div>
+
+<!-- ─── Ernährung / Kalorientracker ───────────────────────────────────── -->
+<section id="page-nutrition" class="page">
+  <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start">
+    <div>
+      <h1>Ernährung</h1>
+      <p id="nut-goal-info">Tagesziel</p>
+    </div>
+    <button class="icon-btn" aria-label="Tagesziel einstellen" onclick="openNutGoals()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </div>
+
+  <!-- Datum -->
+  <div class="nut-datebar">
+    <button class="nd-arrow" onclick="nutShiftDay(-1)" aria-label="Vorheriger Tag">‹</button>
+    <span id="nut-date-label">Heute</span>
+    <button class="nd-arrow" id="nut-fwd" onclick="nutShiftDay(1)" aria-label="Nächster Tag">›</button>
+  </div>
+
+  <!-- Tagesübersicht -->
+  <div class="card nut-summary">
+    <div class="nut-ring-wrap" id="nut-ring-wrap"></div>
+    <div class="nut-macros" id="nut-macros"></div>
+  </div>
+
+  <!-- Mahlzeiten -->
+  <div id="nut-meals"></div>
+
+  <div class="app-version">Strong Gnome</div>
+</section>
+
+<!-- Modal-Container für Ernährung (Hinzufügen / Ziel) -->
+<div id="nut-modal-root"></div>
+
+<!-- ─── Navigation ────────────────────────────────────────────────────── -->
+<nav>
+  <button class="nav-btn active" data-page="dashboard" aria-label="Start">
+    <span class="icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
+    </span>
+    <span>Start</span>
+  </button>
+  <button class="nav-btn" data-page="training" aria-label="Training">
+    <span class="icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+    </span>
+    <span>Training</span>
+  </button>
+  <button class="nav-btn" data-page="nutrition" aria-label="Ernährung">
+    <span class="icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h0a2 2 0 0 0 2-2V2"/><path d="M5 2v20"/><path d="M21 15V2a5 5 0 0 0-3 9v4"/><path d="M18 15v7"/></svg>
+    </span>
+    <span>Essen</span>
+  </button>
+  <button class="nav-btn" data-page="history" aria-label="Verlauf">
+    <span class="icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+    </span>
+    <span>Verlauf</span>
+  </button>
+  <button class="nav-btn" data-page="checkin" aria-label="Einchecken">
+    <span class="icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>
+    </span>
+    <span>Check-in</span>
+  </button>
+  <button class="nav-btn" data-page="stats" aria-label="Statistiken">
+    <span class="icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/></svg>
+    </span>
+    <span>Statistik</span>
+  </button>
+</nav>
+
+<script src="./app.js?v=41"></script>
+</body>
+</html>
