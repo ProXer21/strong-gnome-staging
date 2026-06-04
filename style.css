@@ -1861,22 +1861,28 @@ body:not([data-state="app"]) .page { display: none !important; }
 .nd-arrow:disabled { opacity: .35; cursor: default; }
 #nut-date-label { min-width: 130px; text-align: center; font-size: 16px; }
 
-/* Tagesübersicht: Ring + Makros */
-.nut-summary { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
-.nut-ring-wrap { position: relative; width: 132px; height: 132px; flex: 0 0 auto; }
-.kcal-ring { width: 132px; height: 132px; }
-.kr-track { fill: none; stroke: var(--border); stroke-width: 12; }
-.kr-val { fill: none; stroke-width: 12; stroke-linecap: round; transition: stroke-dasharray .5s ease; }
-.kcal-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 14px; box-sizing: border-box; }
-.kc-num { font-size: 28px; font-weight: 900; line-height: 1; color: var(--text); max-width: 100%; }
-.kc-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.kc-rem { font-size: 12px; font-weight: 800; color: var(--mint); margin-top: 4px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.kc-rem.over { color: var(--danger); }
-.nut-macros { flex: 1 1 160px; display: flex; flex-direction: column; gap: 12px; min-width: 150px; }
-.macro-top { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; margin-bottom: 5px; }
-.macro-val { color: var(--text-muted); font-weight: 600; }
-.macro-track { height: 9px; border-radius: 6px; background: var(--border); overflow: hidden; }
+/* Tagesübersicht: Kopf (Gegessen · Gauge · Ziel) + Makro-Spalten */
+.nut-summary { display: flex; flex-direction: column; gap: 6px; }
+.nut-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; }
+.nut-side { text-align: center; min-width: 0; }
+.ns-val { font-size: 19px; font-weight: 900; color: var(--text); line-height: 1.1; overflow: hidden; text-overflow: ellipsis; }
+.ns-lbl { font-size: 12px; color: var(--text-muted); font-weight: 600; margin-top: 3px; }
+
+.nut-gauge-wrap { position: relative; width: 150px; height: 150px; flex: 0 0 auto; }
+.kcal-gauge { width: 150px; height: 150px; transform: rotate(0); }
+.kg-track { fill: none; stroke: var(--border); stroke-width: 11; stroke-linecap: round; }
+.kg-val { fill: none; stroke-width: 11; stroke-linecap: round; transition: stroke-dasharray .5s ease; }
+.gauge-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 22px; box-sizing: border-box; }
+.gc-num { font-size: 28px; font-weight: 900; line-height: 1; color: var(--text); max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.gc-num.over { color: var(--danger); }
+.gc-lbl { font-size: 11px; color: var(--text-muted); margin-top: 3px; font-weight: 600; }
+
+.nut-macros { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 8px; }
+.macro { text-align: center; min-width: 0; }
+.macro-lbl { font-size: 12px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+.macro-track { height: 7px; border-radius: 6px; background: var(--border); overflow: hidden; }
 .macro-fill { height: 100%; border-radius: 6px; transition: width .5s ease; }
+.macro-val { font-size: 12px; color: var(--text-muted); font-weight: 600; margin-top: 6px; }
 
 /* Mahlzeiten */
 .nut-meal { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 14px; box-shadow: var(--shadow-sm); }

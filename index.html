@@ -33,7 +33,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
-  <link rel="stylesheet" href="./style.css?v=34" />
+  <link rel="stylesheet" href="./style.css?v=35" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -659,7 +659,17 @@
 
   <!-- Tagesübersicht -->
   <div class="card nut-summary">
-    <div class="nut-ring-wrap" id="nut-ring-wrap"></div>
+    <div class="nut-top">
+      <div class="nut-side">
+        <div class="ns-val" id="nut-eaten">0</div>
+        <div class="ns-lbl">Gegessen</div>
+      </div>
+      <div class="nut-gauge-wrap" id="nut-gauge-wrap"></div>
+      <div class="nut-side">
+        <div class="ns-val" id="nut-goalval">0</div>
+        <div class="ns-lbl">Ziel</div>
+      </div>
+    </div>
     <div class="nut-macros" id="nut-macros"></div>
   </div>
 
@@ -712,6 +722,6 @@
   </button>
 </nav>
 
-<script src="./app.js?v=45"></script>
+<script src="./app.js?v=46"></script>
 </body>
 </html>

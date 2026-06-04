@@ -2464,18 +2464,21 @@ function nutShiftDay(delta) {
   renderNutrition();
 }
 
-// Ring (SVG) für die Kalorien
-function nutRing(consumed, goal) {
-  const r = 52, c = 2 * Math.PI * r;
+// Bogen-Gauge (SVG, 270° offen unten) für die Kalorien
+function nutGauge(consumed, goal) {
+  const r = 54, c = 2 * Math.PI * r;
+  const arc = 0.75;                 // 270° sichtbarer Bogen (unten offen)
+  const arcLen = c * arc;
   const pct = goal > 0 ? Math.min(1, consumed / goal) : 0;
   const over = goal > 0 && consumed > goal;
-  const dash = c * pct;
+  const valLen = arcLen * pct;
   const stroke = over ? 'var(--danger)' : 'var(--primary)';
-  return `<svg viewBox="0 0 120 120" class="kcal-ring" aria-hidden="true">
-    <circle cx="60" cy="60" r="${r}" class="kr-track"/>
-    <circle cx="60" cy="60" r="${r}" class="kr-val" stroke="${stroke}"
-      stroke-dasharray="${dash.toFixed(1)} ${(c - dash).toFixed(1)}" stroke-dashoffset="0"
-      transform="rotate(-90 60 60)"/>
+  // rotate 135° → Lücke mittig unten
+  return `<svg viewBox="0 0 120 120" class="kcal-gauge" aria-hidden="true">
+    <circle cx="60" cy="60" r="${r}" class="kg-track"
+      stroke-dasharray="${arcLen.toFixed(1)} ${(c - arcLen).toFixed(1)}" transform="rotate(135 60 60)"/>
+    <circle cx="60" cy="60" r="${r}" class="kg-val" stroke="${stroke}"
+      stroke-dasharray="${valLen.toFixed(1)} ${(c - valLen).toFixed(1)}" transform="rotate(135 60 60)"/>
   </svg>`;
 }
 
@@ -2495,27 +2498,32 @@ function renderNutrition() {
   const fwd = document.getElementById('nut-fwd');
   if (fwd) fwd.disabled = isToday;
 
-  // Kalorien-Ring + Zahlen
-  const ringWrap = document.getElementById('nut-ring-wrap');
-  if (ringWrap) {
-    const kcalStr = nutFmt(totals.kcal);
-    ringWrap.innerHTML = nutRing(totals.kcal, goals.kcal) +
-      `<div class="kcal-center">
-         <div class="kc-num" style="font-size:${nutNumFont(kcalStr)}px">${kcalStr}</div>
-         <div class="kc-sub">von ${nutFmt(goals.kcal)} kcal</div>
-         <div class="kc-rem ${remaining < 0 ? 'over' : ''}">${remaining >= 0 ? nutFmt(remaining) + ' übrig' : nutFmt(Math.abs(remaining)) + ' drüber'}</div>
+  // Kopf: Gegessen · Gauge · Ziel
+  const eatenEl = document.getElementById('nut-eaten');
+  if (eatenEl) eatenEl.textContent = nutFmt(totals.kcal);
+  const goalEl = document.getElementById('nut-goalval');
+  if (goalEl) goalEl.textContent = nutFmt(goals.kcal);
+
+  const gaugeWrap = document.getElementById('nut-gauge-wrap');
+  if (gaugeWrap) {
+    const centerNum = nutFmt(Math.abs(remaining));
+    gaugeWrap.innerHTML = nutGauge(totals.kcal, goals.kcal) +
+      `<div class="gauge-center">
+         <div class="gc-num ${remaining < 0 ? 'over' : ''}" style="font-size:${nutNumFont(centerNum)}px">${centerNum}</div>
+         <div class="gc-lbl">${remaining >= 0 ? 'kcal übrig' : 'kcal zu viel'}</div>
        </div>`;
   }
 
-  // Makro-Balken
+  // Makros: 3 Spalten (Label · Balken · Wert)
   const macroWrap = document.getElementById('nut-macros');
   if (macroWrap) {
     macroWrap.innerHTML = MACROS.map(m => {
       const have = Math.round(totals[m.key]), goal = goals[m.key] || 0;
       const pct = goal > 0 ? Math.min(100, Math.round((have / goal) * 100)) : 0;
       return `<div class="macro">
-        <div class="macro-top"><span>${m.label}</span><span class="macro-val">${nutFmt(have)} / ${nutFmt(goal)} g</span></div>
+        <div class="macro-lbl">${m.label}</div>
         <div class="macro-track"><div class="macro-fill" style="width:${pct}%;background:${m.color}"></div></div>
+        <div class="macro-val">${nutFmt(have)} / ${nutFmt(goal)} g</div>
       </div>`;
     }).join('');
   }
