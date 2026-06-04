@@ -570,30 +570,11 @@ function renderDashboard() {
   const gms = document.getElementById('goal-month-stat');
   if (gms) { try { gms.textContent = new Date(pGoalDate(data)).toLocaleDateString('de-DE', { month: 'short' }); } catch (e) {} }
 
-  const routine = nextRoutine(data);
-  const nwList = document.getElementById('nw-exercises');
-  if (routine) {
-    document.getElementById('nw-title').textContent = `${routine.emoji || ''} ${routine.name}`.trim();
-    nwList.innerHTML = '';
-    routine.exercises.slice(0, 5).forEach(ex => {
-      const rec = calculateNextWeight(ex.name, data);
-      const div = document.createElement('div');
-      div.className = 'nw-exercise';
-      div.innerHTML = `<span class="ex-name">${escapeHtml(ex.name)}</span>
-        <span class="ex-arrow">→</span>
-        <span class="ex-rec">${rec !== null ? rec + ' kg' : ex.sets + '×' + ex.repsMin}</span>`;
-      nwList.appendChild(div);
-    });
-  } else {
-    document.getElementById('nw-title').textContent = 'Kein Trainingsplan';
-    nwList.innerHTML = '<div class="nw-exercise"><span class="ex-name">Lege im Training einen Trainingsplan an</span></div>';
-  }
-
   // „Heute gegessen"-Karte
   const dashNut = document.getElementById('dash-nut');
   if (dashNut) {
     const goals = nutEffectiveGoals(data);
-    const t = nutDayTotals(data, today());
+    const t = nutDayTotals(data, nutToday());
     const rem = goals.kcal - t.kcal;
     const pct = goals.kcal > 0 ? Math.min(100, Math.round((t.kcal / goals.kcal) * 100)) : 0;
     document.getElementById('dn-kcal').textContent = Math.round(t.kcal);
@@ -2421,7 +2402,11 @@ const MACROS = [
   { key: 'fat',     label: 'Fett', short: 'F', color: 'var(--mint)' },
 ];
 
-let nutDate = today();          // aktuell angezeigter Tag (YYYY-MM-DD)
+// Lokales Datum als YYYY-MM-DD (NICHT toISOString → das wäre UTC und nachts um den Vortag verschoben)
+function nutISO(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function nutToday() { return nutISO(new Date()); }
+
+let nutDate = nutToday();       // aktuell angezeigter Tag (YYYY-MM-DD, lokale Zeit)
 let nutModalMeal = null;        // Mahlzeit, zu der gerade hinzugefügt wird
 
 // Effektive Tagesziele: manuell ODER automatisch berechnet
@@ -2461,10 +2446,10 @@ function nutDayTotals(data, date) {
 }
 
 function nutShiftDay(delta) {
-  const d = new Date(nutDate + 'T00:00:00');
+  const d = new Date(nutDate + 'T12:00:00');   // Mittag → DST-/Mitternachts-Sprünge vermeiden
   d.setDate(d.getDate() + delta);
-  const iso = d.toISOString().slice(0, 10);
-  if (iso > today()) return;          // nicht in die Zukunft
+  const iso = nutISO(d);
+  if (iso > nutToday()) return;        // nicht in die Zukunft
   nutDate = iso;
   renderNutrition();
 }
@@ -2488,7 +2473,7 @@ function renderNutrition() {
   const data = loadData();
   const goals = nutEffectiveGoals(data);
   const totals = nutDayTotals(data, nutDate);
-  const isToday = nutDate === today();
+  const isToday = nutDate === nutToday();
   const remaining = goals.kcal - totals.kcal;
 
   // Datumskopf

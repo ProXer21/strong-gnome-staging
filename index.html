@@ -33,7 +33,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
-  <link rel="stylesheet" href="./style.css?v=30" />
+  <link rel="stylesheet" href="./style.css?v=31" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -301,17 +301,6 @@
       <div class="stat-label">Zielmonat</div>
     </div>
   </div>
-
-  <!-- Next workout -->
-  <div class="next-workout">
-    <div class="nw-label">Nächstes Training</div>
-    <h3 id="nw-title">Tag A — Glutes & Beine I</h3>
-    <div class="nw-exercises" id="nw-exercises"></div>
-  </div>
-
-  <button class="save-workout-btn" onclick="navigate('training')">
-    Training starten →
-  </button>
 
   <!-- Heute gegessen -->
   <div class="card dash-nut-card" id="dash-nut" role="button" onclick="navigate('nutrition')">
@@ -691,17 +680,17 @@
     </span>
     <span>Start</span>
   </button>
-  <button class="nav-btn" data-page="training" aria-label="Training">
-    <span class="icon" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-    </span>
-    <span>Training</span>
-  </button>
   <button class="nav-btn" data-page="nutrition" aria-label="Ernährung">
     <span class="icon" aria-hidden="true">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h0a2 2 0 0 0 2-2V2"/><path d="M5 2v20"/><path d="M21 15V2a5 5 0 0 0-3 9v4"/><path d="M18 15v7"/></svg>
     </span>
     <span>Essen</span>
+  </button>
+  <button class="nav-btn" data-page="training" aria-label="Training">
+    <span class="icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+    </span>
+    <span>Training</span>
   </button>
   <button class="nav-btn" data-page="history" aria-label="Verlauf">
     <span class="icon" aria-hidden="true">
@@ -723,6 +712,6 @@
   </button>
 </nav>
 
-<script src="./app.js?v=41"></script>
+<script src="./app.js?v=42"></script>
 </body>
 </html>
