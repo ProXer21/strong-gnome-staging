@@ -1,9 +1,9 @@
-const CACHE_NAME = 'sg-staging-v51';
+const CACHE_NAME = 'sg-staging-v52';
 const ASSETS = [
   './',
   './index.html',
   './style.css?v=38',
-  './app.js?v=51',
+  './app.js?v=52',
   './manifest.json',
   './logo.png',
   './icon-192.png',
