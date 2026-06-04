@@ -1867,10 +1867,10 @@ body:not([data-state="app"]) .page { display: none !important; }
 .kcal-ring { width: 132px; height: 132px; }
 .kr-track { fill: none; stroke: var(--border); stroke-width: 12; }
 .kr-val { fill: none; stroke-width: 12; stroke-linecap: round; transition: stroke-dasharray .5s ease; }
-.kcal-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
-.kc-num { font-size: 28px; font-weight: 900; line-height: 1; color: var(--text); }
-.kc-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-.kc-rem { font-size: 12px; font-weight: 800; color: var(--mint); margin-top: 4px; }
+.kcal-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 14px; box-sizing: border-box; }
+.kc-num { font-size: 28px; font-weight: 900; line-height: 1; color: var(--text); max-width: 100%; }
+.kc-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kc-rem { font-size: 12px; font-weight: 800; color: var(--mint); margin-top: 4px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kc-rem.over { color: var(--danger); }
 .nut-macros { flex: 1 1 160px; display: flex; flex-direction: column; gap: 12px; min-width: 150px; }
 .macro-top { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; margin-bottom: 5px; }

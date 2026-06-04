@@ -577,9 +577,9 @@ function renderDashboard() {
     const t = nutDayTotals(data, nutToday());
     const rem = goals.kcal - t.kcal;
     const pct = goals.kcal > 0 ? Math.min(100, Math.round((t.kcal / goals.kcal) * 100)) : 0;
-    document.getElementById('dn-kcal').textContent = Math.round(t.kcal);
-    document.getElementById('dn-goal').textContent = goals.kcal;
-    document.getElementById('dn-rem').textContent  = rem >= 0 ? `${rem} kcal übrig` : `${Math.abs(rem)} kcal drüber`;
+    document.getElementById('dn-kcal').textContent = nutFmt(t.kcal);
+    document.getElementById('dn-goal').textContent = nutFmt(goals.kcal);
+    document.getElementById('dn-rem').textContent  = rem >= 0 ? `${nutFmt(rem)} kcal übrig` : `${nutFmt(Math.abs(rem))} kcal drüber`;
     document.getElementById('dn-rem').classList.toggle('over', rem < 0);
     document.getElementById('dn-bar').style.width = pct + '%';
     document.getElementById('dn-bar').style.background = rem < 0 ? 'var(--danger)' : 'var(--grad-primary)';
@@ -2409,6 +2409,16 @@ function nutToday() { return nutISO(new Date()); }
 let nutDate = nutToday();       // aktuell angezeigter Tag (YYYY-MM-DD, lokale Zeit)
 let nutModalMeal = null;        // Mahlzeit, zu der gerade hinzugefügt wird
 
+// Sinnvolle Obergrenzen pro EINTRAG (verhindert absurde Eingaben + Zahlen-Overflow im UI)
+const NUT_MAX_KCAL = 10000;     // kcal je Eintrag (eine riesige Mahlzeit ~3000)
+const NUT_MAX_MACRO = 2000;     // g je Makro/Eintrag
+const NUT_MAX_NAME = 60;        // Zeichen
+
+// Zahl gerundet + mit Tausenderpunkten (de-DE) — verhindert Überlauf-Optik
+function nutFmt(n) { return Math.round(n || 0).toLocaleString('de-DE'); }
+// Schriftgröße für die Ring-Mitte je nach Stellenanzahl (große Summen bleiben im Kreis)
+function nutNumFont(str) { const n = str.length; return n <= 5 ? 28 : n <= 7 ? 21 : n <= 9 ? 16 : 13; }
+
 // Effektive Tagesziele: manuell ODER automatisch berechnet
 function nutEffectiveGoals(data) {
   const g = data.nutrition.goals;
@@ -2488,11 +2498,12 @@ function renderNutrition() {
   // Kalorien-Ring + Zahlen
   const ringWrap = document.getElementById('nut-ring-wrap');
   if (ringWrap) {
+    const kcalStr = nutFmt(totals.kcal);
     ringWrap.innerHTML = nutRing(totals.kcal, goals.kcal) +
       `<div class="kcal-center">
-         <div class="kc-num">${Math.round(totals.kcal)}</div>
-         <div class="kc-sub">von ${goals.kcal} kcal</div>
-         <div class="kc-rem ${remaining < 0 ? 'over' : ''}">${remaining >= 0 ? remaining + ' übrig' : Math.abs(remaining) + ' drüber'}</div>
+         <div class="kc-num" style="font-size:${nutNumFont(kcalStr)}px">${kcalStr}</div>
+         <div class="kc-sub">von ${nutFmt(goals.kcal)} kcal</div>
+         <div class="kc-rem ${remaining < 0 ? 'over' : ''}">${remaining >= 0 ? nutFmt(remaining) + ' übrig' : nutFmt(Math.abs(remaining)) + ' drüber'}</div>
        </div>`;
   }
 
@@ -2503,7 +2514,7 @@ function renderNutrition() {
       const have = Math.round(totals[m.key]), goal = goals[m.key] || 0;
       const pct = goal > 0 ? Math.min(100, Math.round((have / goal) * 100)) : 0;
       return `<div class="macro">
-        <div class="macro-top"><span>${m.label}</span><span class="macro-val">${have} / ${goal} g</span></div>
+        <div class="macro-top"><span>${m.label}</span><span class="macro-val">${nutFmt(have)} / ${nutFmt(goal)} g</span></div>
         <div class="macro-track"><div class="macro-fill" style="width:${pct}%;background:${m.color}"></div></div>
       </div>`;
     }).join('');
@@ -2519,16 +2530,16 @@ function renderNutrition() {
         <div class="nut-entry" onclick="openFoodModal('${meal.key}','${e.id}')" role="button">
           <div class="ne-info">
             <span class="ne-name">${escapeHtml(e.name || 'Eintrag')}</span>
-            <span class="ne-macros">E ${Math.round(e.protein || 0)} · KH ${Math.round(e.carbs || 0)} · F ${Math.round(e.fat || 0)} g</span>
+            <span class="ne-macros">E ${nutFmt(e.protein)} · KH ${nutFmt(e.carbs)} · F ${nutFmt(e.fat)} g</span>
           </div>
-          <span class="ne-kcal">${Math.round(e.kcal || 0)} kcal</span>
+          <span class="ne-kcal">${nutFmt(e.kcal)} kcal</span>
           <button class="ne-del" onclick="event.stopPropagation(); nutDeleteEntry('${e.id}')" aria-label="Eintrag löschen">✕</button>
         </div>`).join('')
         : '<div class="nut-empty">Noch nichts erfasst</div>';
       return `<div class="nut-meal">
         <div class="nm-head">
           <span class="nm-title">${meal.emoji} ${meal.label}</span>
-          <span class="nm-sub">${Math.round(sub)} kcal</span>
+          <span class="nm-sub">${nutFmt(sub)} kcal</span>
         </div>
         ${rows}
         <button class="nm-add" onclick="openFoodModal('${meal.key}')">+ Hinzufügen</button>
@@ -2539,8 +2550,8 @@ function renderNutrition() {
   // Ziel-Modus-Hinweis
   const gi = document.getElementById('nut-goal-info');
   if (gi) gi.textContent = data.nutrition.goals.mode === 'auto'
-    ? `Automatisches Ziel: ${goals.kcal} kcal/Tag`
-    : `Manuelles Ziel: ${goals.kcal} kcal/Tag`;
+    ? `Automatisches Ziel: ${nutFmt(goals.kcal)} kcal/Tag`
+    : `Manuelles Ziel: ${nutFmt(goals.kcal)} kcal/Tag`;
 }
 
 // ── Lebensmittel hinzufügen / bearbeiten (Modal) ──
@@ -2582,16 +2593,16 @@ function openFoodModal(meal, entryId) {
       <div class="modal-divider"><span>oder neu eingeben</span></div>`}
       <div class="modal-form">
         <label>Bezeichnung
-          <input id="nf-name" class="input-field" type="text" list="nf-foodlist" autocomplete="off" oninput="nutNameSuggest()" placeholder="z. B. Haferflocken mit Milch" value="${editing ? escapeHtml(editing.name || '') : ''}">
+          <input id="nf-name" class="input-field" type="text" list="nf-foodlist" autocomplete="off" maxlength="${NUT_MAX_NAME}" oninput="nutNameSuggest()" placeholder="z. B. Haferflocken mit Milch" value="${editing ? escapeHtml(editing.name || '') : ''}">
           <datalist id="nf-foodlist">${dataListOptions}</datalist>
         </label>
         <label>Kalorien (kcal)
-          <input id="nf-kcal" class="input-field" type="number" inputmode="decimal" min="0" placeholder="0" value="${editing ? (editing.kcal ?? '') : ''}">
+          <input id="nf-kcal" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_KCAL}" placeholder="0" value="${editing ? (editing.kcal ?? '') : ''}">
         </label>
         <div class="macro-inputs">
-          <label>Eiweiß (g)<input id="nf-protein" class="input-field" type="number" inputmode="decimal" min="0" placeholder="0" value="${editing ? (editing.protein ?? '') : ''}"></label>
-          <label>KH (g)<input id="nf-carbs" class="input-field" type="number" inputmode="decimal" min="0" placeholder="0" value="${editing ? (editing.carbs ?? '') : ''}"></label>
-          <label>Fett (g)<input id="nf-fat" class="input-field" type="number" inputmode="decimal" min="0" placeholder="0" value="${editing ? (editing.fat ?? '') : ''}"></label>
+          <label>Eiweiß (g)<input id="nf-protein" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_MACRO}" placeholder="0" value="${editing ? (editing.protein ?? '') : ''}"></label>
+          <label>KH (g)<input id="nf-carbs" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_MACRO}" placeholder="0" value="${editing ? (editing.carbs ?? '') : ''}"></label>
+          <label>Fett (g)<input id="nf-fat" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_MACRO}" placeholder="0" value="${editing ? (editing.fat ?? '') : ''}"></label>
         </div>
         ${editing ? '' : `<label class="chk"><input type="checkbox" id="nf-save"> In „Meine Lebensmittel" speichern</label>`}
       </div>
@@ -2649,15 +2660,19 @@ function nutDeleteSelectedFood() {
   nutDeleteFood(id);   // entfernt + zeichnet das Modal neu
 }
 
-function nutNum(id) { const el = document.getElementById(id); const v = el ? parseFloat(el.value) : NaN; return isNaN(v) ? 0 : Math.max(0, v); }
+// liest einen Zahlenwert, begrenzt auf [0, max] (verhindert absurde Eingaben/Overflow)
+function nutNum(id, max) { const el = document.getElementById(id); const v = el ? parseFloat(el.value) : NaN; return isNaN(v) ? 0 : Math.min(Math.max(0, v), max || NUT_MAX_KCAL); }
 
 function nutSaveEntry(entryId) {
-  const name = val('nf-name');
-  const kcal = nutNum('nf-kcal');
+  let name = val('nf-name');
+  const rawKcal = (() => { const el = document.getElementById('nf-kcal'); const v = el ? parseFloat(el.value) : NaN; return isNaN(v) ? 0 : v; })();
+  const kcal = nutNum('nf-kcal', NUT_MAX_KCAL);
   if (!name) { showToast('Bitte eine Bezeichnung eingeben', '#c46a04'); return; }
   if (!kcal) { showToast('Bitte Kalorien eingeben', '#c46a04'); return; }
+  if (rawKcal > NUT_MAX_KCAL) showToast(`Max. ${nutFmt(NUT_MAX_KCAL)} kcal pro Eintrag — gekürzt`, '#c46a04');
+  if (name.length > NUT_MAX_NAME) name = name.slice(0, NUT_MAX_NAME);
   const data = loadData();
-  const fields = { name, kcal, protein: nutNum('nf-protein'), carbs: nutNum('nf-carbs'), fat: nutNum('nf-fat') };
+  const fields = { name, kcal, protein: nutNum('nf-protein', NUT_MAX_MACRO), carbs: nutNum('nf-carbs', NUT_MAX_MACRO), fat: nutNum('nf-fat', NUT_MAX_MACRO) };
 
   if (entryId) {
     const e = data.nutrition.log.find(x => x.id === entryId);
@@ -2784,17 +2799,18 @@ function saveNutGoals() {
   const g = data.nutrition.goals;
   const mode = _pendingNutMode || g.mode;
   g.mode = mode;
+  const clamp = (v, max) => Math.min(Math.max(0, v), max);
   if (mode === 'auto') {
     g.sex = document.getElementById('ng-sex')?.value || 'female';
-    g.age = parseFloat(document.getElementById('ng-age')?.value) || g.age;
-    g.height = parseFloat(document.getElementById('ng-height')?.value) || g.height;
+    g.age = clamp(parseFloat(document.getElementById('ng-age')?.value) || g.age, 120);
+    g.height = clamp(parseFloat(document.getElementById('ng-height')?.value) || g.height, 250);
     g.activity = parseFloat(document.getElementById('ng-activity')?.value) || g.activity;
     g.breastfeeding = !!document.getElementById('ng-bf')?.checked;
   } else {
-    g.kcal = parseFloat(document.getElementById('ng-kcal')?.value) || g.kcal;
-    g.protein = parseFloat(document.getElementById('ng-protein')?.value) || g.protein;
-    g.carbs = parseFloat(document.getElementById('ng-carbs')?.value) || g.carbs;
-    g.fat = parseFloat(document.getElementById('ng-fat')?.value) || g.fat;
+    g.kcal = clamp(parseFloat(document.getElementById('ng-kcal')?.value) || g.kcal, 20000) || g.kcal;
+    g.protein = clamp(parseFloat(document.getElementById('ng-protein')?.value) || g.protein, NUT_MAX_MACRO);
+    g.carbs = clamp(parseFloat(document.getElementById('ng-carbs')?.value) || g.carbs, NUT_MAX_MACRO);
+    g.fat = clamp(parseFloat(document.getElementById('ng-fat')?.value) || g.fat, NUT_MAX_MACRO);
   }
   _pendingNutMode = null;
   saveData(data);
