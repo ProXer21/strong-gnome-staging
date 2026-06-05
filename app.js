@@ -585,17 +585,17 @@ function renderDashboard() {
     document.getElementById('dn-bar').style.background = rem < 0 ? 'var(--danger)' : 'var(--grad-primary)';
   }
 
-  // Schnellzugriff: Mahlzeiten-Chips → direkt zur Detailansicht
+  // Schnellzugriff: Mahlzeiten untereinander (wie im Essen-Reiter) → tippen = Detail, „+" = direkt einfügen
   const dashMeals = document.getElementById('dash-meals');
   if (dashMeals) {
+    const goals = nutEffectiveGoals(data);
     const todayE = nutDayEntries(data, nutToday());
     dashMeals.innerHTML = MEALS.map(meal => {
-      const sub = todayE.filter(e => e.meal === meal.key).reduce((s, e) => s + (+e.kcal || 0), 0);
-      return `<button type="button" class="dm-chip" onclick="openMealQuick('${meal.key}')">
-        <span class="dm-emoji">${meal.emoji}</span>
-        <span class="dm-label">${meal.label}</span>
-        <span class="dm-kcal">${nutFmt(sub)} kcal</span>
-      </button>`;
+      const entries = todayE.filter(e => e.meal === meal.key);
+      const sub = entries.reduce((s, e) => s + (+e.kcal || 0), 0);
+      const items = entries.map(e => e.name).filter(Boolean);
+      return nutMealCardMarkup(meal, sub, nutMealGoal(goals, meal.key), items,
+        `openMealQuick('${meal.key}')`, `addMealQuick('${meal.key}')`);
     }).join('');
   }
 }
@@ -2547,6 +2547,24 @@ function nutMiniRing(pct, over) {
   </svg>`;
 }
 
+// Eine Mahlzeit-Karte (Ring + Titel + kcal + Einträge-Vorschau + „+") — geteilt von Essen-Reiter & Start
+function nutMealCardMarkup(meal, sub, mGoal, items, tapCall, plusCall) {
+  const pct = mGoal > 0 ? Math.min(100, Math.round((sub / mGoal) * 100)) : 0;
+  const itemsLbl = items.length
+    ? escapeHtml(items.slice(0, 2).join(', ') + (items.length > 2 ? ` +${items.length - 2}` : ''))
+    : 'Noch nichts erfasst';
+  return `<button type="button" class="nm-card" onclick="${tapCall}">
+    <span class="nm-ring">${nutMiniRing(pct, sub > mGoal)}<span class="nm-emoji">${meal.emoji}</span></span>
+    <span class="nm-mid">
+      <span class="nm-title">${meal.label} <span class="nm-arrow">›</span></span>
+      <span class="nm-kcal">${nutFmt(sub)}${mGoal ? ' / ' + nutFmt(mGoal) : ''} kcal</span>
+      <span class="nm-items">${itemsLbl}</span>
+    </span>
+    <span class="nm-plus" role="button" aria-label="Schnell hinzufügen"
+          onclick="event.stopPropagation(); ${plusCall}">+</span>
+  </button>`;
+}
+
 function renderNutrition() {
   const data = loadData();
   const goals = nutEffectiveGoals(data);
@@ -2599,22 +2617,9 @@ function renderNutrition() {
     mealsWrap.innerHTML = MEALS.map(meal => {
       const entries = nutDayEntries(data, nutDate).filter(e => e.meal === meal.key);
       const sub = entries.reduce((s, e) => s + (+e.kcal || 0), 0);
-      const mGoal = nutMealGoal(goals, meal.key);
-      const pct = mGoal > 0 ? Math.min(100, Math.round((sub / mGoal) * 100)) : 0;
       const items = entries.map(e => e.name).filter(Boolean);
-      const itemsLbl = items.length
-        ? escapeHtml(items.slice(0, 2).join(', ') + (items.length > 2 ? ` +${items.length - 2}` : ''))
-        : 'Noch nichts erfasst';
-      return `<button type="button" class="nm-card" onclick="openMealDetail('${meal.key}')">
-        <span class="nm-ring">${nutMiniRing(pct, sub > mGoal)}<span class="nm-emoji">${meal.emoji}</span></span>
-        <span class="nm-mid">
-          <span class="nm-title">${meal.label} <span class="nm-arrow">›</span></span>
-          <span class="nm-kcal">${nutFmt(sub)}${mGoal ? ' / ' + nutFmt(mGoal) : ''} kcal</span>
-          <span class="nm-items">${itemsLbl}</span>
-        </span>
-        <span class="nm-plus" role="button" aria-label="Schnell hinzufügen"
-              onclick="event.stopPropagation(); openFoodModal('${meal.key}')">+</span>
-      </button>`;
+      return nutMealCardMarkup(meal, sub, nutMealGoal(goals, meal.key), items,
+        `openMealDetail('${meal.key}')`, `openFoodModal('${meal.key}')`);
     }).join('');
   }
 
@@ -2754,6 +2759,8 @@ function closeMealDetail() { nutDetailMeal = null; closeFoodModal(); }
 
 // Schnellzugriff vom Start: immer „heute", dann Detailansicht öffnen
 function openMealQuick(mealKey) { nutDate = nutToday(); openMealDetail(mealKey); }
+// Schnellzugriff vom Start: „+" → direkt das Hinzufügen-Vollbild (immer heute)
+function addMealQuick(mealKey) { nutDate = nutToday(); openFoodModal(mealKey); }
 
 // Eintrag aus der Detailansicht bearbeiten (behält die Detail-Rückkehr bei)
 function nutEditEntry(mealKey, entryId) {
