@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sg-staging-v59';
+const CACHE_NAME = 'sg-staging-v60';
 const ASSETS = [
   './',
   './index.html',
