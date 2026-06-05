@@ -2058,3 +2058,31 @@ select.input-field {
 
 .modal-divider { margin: 16px 0 14px; }
 .modal-form > label { gap: 7px; }
+
+/* ─── Hinzufügen-Dialog: kompakter (weniger Abstände) ───────────────────────── */
+.modal-sheet { padding: 14px 14px 12px; border-radius: 20px; }
+.modal-head { margin-bottom: 10px; }
+.modal-head h3 { font-size: 17px; }
+.modal-x { width: 30px; height: 30px; }
+
+/* schlankere Eingabefelder */
+input.input-field, select.input-field, textarea.input-field { padding: 9px 12px; font-size: 15px; }
+#nf-kcal { font-size: 17px; }
+
+/* Such-/Scan-Karte kompakt */
+.off-search { padding: 9px 10px 8px; margin-bottom: 10px; border-radius: 13px; }
+.off-sec-label { margin-bottom: 6px; }
+.off-scan { width: 46px; }
+.off-results { margin-top: 7px; max-height: 168px; gap: 5px; }
+.off-item { padding: 8px 11px; }
+
+/* Formular enger */
+.modal-form { gap: 8px; }
+.modal-form > label { gap: 4px; }
+.macro-inputs { gap: 8px; }
+.modal-divider { margin: 10px 0 8px; }
+.menge-row { gap: 7px; }
+.chk { padding: 2px 0; gap: 9px !important; }
+.chk input { width: 22px; height: 22px; }
+.modal-actions { margin-top: 12px; }
+.modal-actions .save-workout-btn { padding: 12px; }
