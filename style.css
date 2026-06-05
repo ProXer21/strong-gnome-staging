@@ -2020,3 +2020,8 @@ select.input-field {
 .nws-macros { display: flex; justify-content: space-around; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
 .nws-m { font-size: 12px; color: var(--text-muted); font-weight: 600; }
 .nws-m b { font-weight: 800; }
+
+/* Ernährung: Menge + Einheiten-Auswahl */
+.menge-row { display: flex; gap: 8px; align-items: stretch; }
+.menge-row .input-field:first-child { flex: 1; min-width: 0; }
+.menge-row select.input-field { flex: 0 0 auto; width: 150px; padding-right: 30px; }

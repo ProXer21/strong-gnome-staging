@@ -2426,6 +2426,7 @@ function nutToday() { return nutISO(new Date()); }
 let nutDate = nutToday();       // aktuell angezeigter Tag (YYYY-MM-DD, lokale Zeit)
 let nutModalMeal = null;        // Mahlzeit, zu der gerade hinzugefügt wird
 let nutPer100 = null;           // „je 100 g"-Referenz eines gewählten Datenbank-Produkts
+let nutServingG = null;         // Gramm pro Portion (falls die Datenbank es kennt)
 let _offTimer = null;           // Debounce-Timer für die Open-Food-Facts-Suche
 
 // Sinnvolle Obergrenzen pro EINTRAG (verhindert absurde Eingaben + Zahlen-Overflow im UI)
@@ -2638,7 +2639,7 @@ function renderNutWeek(data, goals) {
 // ── Lebensmittel hinzufügen / bearbeiten (Modal) ──
 function openFoodModal(meal, entryId) {
   nutModalMeal = meal;
-  nutPer100 = null;          // ggf. aktive „je 100 g"-Referenz zurücksetzen
+  nutPer100 = null; nutServingG = null;   // ggf. aktive „je 100 g"-Referenz zurücksetzen
   const data = loadData();
   const editing = entryId ? data.nutrition.log.find(e => e.id === entryId) : null;
   const root = document.getElementById('nut-modal-root');
@@ -2689,9 +2690,15 @@ function openFoodModal(meal, entryId) {
           <datalist id="nf-foodlist">${dataListOptions}</datalist>
         </label>
         <div id="nf-grams-wrap" style="display:none">
-          <label>Menge (g) <span class="grams-hint">— Werte aus der Datenbank skalieren mit</span>
+          <label>Menge <span class="grams-hint">— Werte skalieren automatisch</span></label>
+          <div class="menge-row">
             <input id="nf-grams" class="input-field" type="number" inputmode="decimal" min="0" max="5000" placeholder="100" oninput="nutGramsRecalc()">
-          </label>
+            <select id="nf-unit" class="input-field" onchange="nutUnitChange()">
+              <option value="g">g</option>
+              <option value="ml">ml</option>
+              <option value="port" id="nf-unit-port" style="display:none">Portion</option>
+            </select>
+          </div>
         </div>
         <label>Kalorien (kcal)
           <input id="nf-kcal" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_KCAL}" placeholder="0" oninput="nutManualEdit()" value="${editing ? (editing.kcal ?? '') : ''}">
@@ -2716,7 +2723,7 @@ function closeFoodModal() {
   if (typeof nutStopScan === 'function') nutStopScan();   // evtl. laufenden Kamera-Scan beenden
   const root = document.getElementById('nut-modal-root');
   if (root) root.innerHTML = '';
-  nutModalMeal = null; nutPer100 = null;
+  nutModalMeal = null; nutPer100 = null; nutServingG = null;
   document.body.classList.remove('nut-modal-open');   // Hintergrund-Scroll wieder freigeben
 }
 
@@ -2758,7 +2765,7 @@ function nutSearchOFF() {
   _offTimer = setTimeout(async () => {
     try {
       const url = 'https://world.openfoodfacts.org/cgi/search.pl?search_terms=' + encodeURIComponent(q) +
-        '&search_simple=1&action=process&json=1&page_size=20&fields=product_name,brands,nutriments,code';
+        '&search_simple=1&action=process&json=1&page_size=20&fields=product_name,brands,nutriments,serving_quantity';
       const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 9000);
       const r = await fetch(url, { signal: ctrl.signal }); clearTimeout(to);
       const d = await r.json();
@@ -2768,7 +2775,8 @@ function nutSearchOFF() {
       box.innerHTML = items.slice(0, 14).map((p, i) => {
         const n = p.nutriments; const id = 'off' + i;
         window._offCache[id] = { name: p.product_name, brand: (p.brands || '').split(',')[0].trim(),
-          kcal: Math.round(n['energy-kcal_100g'] || 0), protein: +n.proteins_100g || 0, carbs: +n.carbohydrates_100g || 0, fat: +n.fat_100g || 0 };
+          kcal: Math.round(n['energy-kcal_100g'] || 0), protein: +n.proteins_100g || 0, carbs: +n.carbohydrates_100g || 0, fat: +n.fat_100g || 0,
+          servingG: parseFloat(p.serving_quantity) || null };
         const f = window._offCache[id];
         return `<button type="button" class="off-item" onclick="nutPickOFF('${id}')">
           <span class="oi-name">${escapeHtml(p.product_name)}${f.brand ? ' · ' + escapeHtml(f.brand) : ''}</span>
@@ -2780,23 +2788,40 @@ function nutSearchOFF() {
   }, 450);
 }
 
-// Datenbank-Treffer übernehmen → „je 100 g"-Referenz setzen, Menge-Feld zeigen
+// Datenbank-Treffer übernehmen → „je 100 g"-Referenz setzen, Menge-Feld + Einheiten zeigen
 function nutPickOFF(id) {
   const f = (window._offCache || {})[id]; if (!f) return;
   nutPer100 = { kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat };
+  nutServingG = (f.servingG && f.servingG > 0) ? f.servingG : null;
   const set = (i, v) => { const el = document.getElementById(i); if (el) el.value = v; };
   set('nf-name', f.name + (f.brand ? ' (' + f.brand + ')' : ''));
   const gw = document.getElementById('nf-grams-wrap'); if (gw) gw.style.display = 'block';
+  // Portion-Einheit nur anbieten, wenn die Datenbank eine Portionsgröße kennt
+  const portOpt = document.getElementById('nf-unit-port');
+  if (portOpt) { portOpt.style.display = nutServingG ? '' : 'none'; portOpt.textContent = nutServingG ? `Portion (${Math.round(nutServingG)} g)` : 'Portion'; }
+  const unitSel = document.getElementById('nf-unit'); if (unitSel) unitSel.value = 'g';
   set('nf-grams', 100);
   nutGramsRecalc();
   const box = document.getElementById('nf-search-results'); if (box) box.innerHTML = '';
   const s = document.getElementById('nf-search'); if (s) s.value = '';
 }
 
-// Menge (g) ändern → kcal/Makros aus der je-100g-Referenz neu berechnen
+// Einheit gewechselt → bei „Portion" sinnvolle Standardmenge (1) setzen, dann neu rechnen
+function nutUnitChange() {
+  const u = document.getElementById('nf-unit')?.value;
+  const g = document.getElementById('nf-grams');
+  if (g && u === 'port') g.value = 1;
+  else if (g && (!g.value || g.value === '1')) g.value = 100;
+  nutGramsRecalc();
+}
+
+// Menge/Einheit ändern → Gramm bestimmen → kcal/Makros aus der je-100g-Referenz neu berechnen
 function nutGramsRecalc() {
   if (!nutPer100) return;
-  const g = parseFloat(document.getElementById('nf-grams')?.value) || 0; const fac = g / 100;
+  const amount = parseFloat(document.getElementById('nf-grams')?.value) || 0;
+  const unit = document.getElementById('nf-unit')?.value || 'g';
+  const grams = unit === 'port' ? amount * (nutServingG || 100) : amount;   // g/ml = 1:1, Portion × Portionsgröße
+  const fac = grams / 100;
   const set = (i, v) => { const el = document.getElementById(i); if (el) el.value = Math.round(v * fac); };
   set('nf-kcal', nutPer100.kcal); set('nf-protein', nutPer100.protein); set('nf-carbs', nutPer100.carbs); set('nf-fat', nutPer100.fat);
 }
@@ -2842,14 +2867,15 @@ function nutStopScan() {
 async function nutLookupBarcode(code) {
   showToast('Barcode ' + code + ' — suche Produkt…');
   try {
-    const r = await fetch('https://world.openfoodfacts.org/api/v2/product/' + encodeURIComponent(code) + '.json?fields=product_name,brands,nutriments');
+    const r = await fetch('https://world.openfoodfacts.org/api/v2/product/' + encodeURIComponent(code) + '.json?fields=product_name,brands,nutriments,serving_quantity');
     const d = await r.json();
     const p = d.product;
     if (!p || !p.nutriments || p.nutriments['energy-kcal_100g'] == null) { showToast('Produkt nicht gefunden — bitte manuell', '#c46a04'); return; }
     const n = p.nutriments;
     window._offCache = window._offCache || {};
     window._offCache.bc = { name: p.product_name || ('Produkt ' + code), brand: (p.brands || '').split(',')[0].trim(),
-      kcal: Math.round(n['energy-kcal_100g'] || 0), protein: +n.proteins_100g || 0, carbs: +n.carbohydrates_100g || 0, fat: +n.fat_100g || 0 };
+      kcal: Math.round(n['energy-kcal_100g'] || 0), protein: +n.proteins_100g || 0, carbs: +n.carbohydrates_100g || 0, fat: +n.fat_100g || 0,
+      servingG: parseFloat(p.serving_quantity) || null };
     nutPickOFF('bc');
     showToast('✓ ' + (p.product_name || 'Produkt') + ' gefunden', '#0f9d72');
   } catch (e) { showToast('Keine Verbindung zur Datenbank', '#c0392b'); }
