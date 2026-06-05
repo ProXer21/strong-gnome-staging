@@ -2003,7 +2003,7 @@ select.input-field {
 /* Spotlight: transparentes Loch, Rest abgedunkelt via riesigem Schatten */
 .tut-spotlight { position: fixed; border-radius: 14px; box-shadow: 0 0 0 9999px rgba(0,0,0,.74), 0 0 0 3px var(--primary), 0 0 18px 3px var(--primary); transition: all .3s ease; pointer-events: none; }
 /* runde, weiche Blase */
-.tut-tip { position: fixed; z-index: 9002; box-sizing: border-box; background: var(--surface); color: var(--text); border-radius: 26px; padding: 18px 20px 15px; box-shadow: var(--shadow-lg); border: 1.5px solid var(--primary); animation: tutPop .22s ease; }
+.tut-tip { position: fixed; z-index: 9002; box-sizing: border-box; background: var(--surface); color: var(--text); border-radius: 26px; padding: 18px 20px 15px; box-shadow: var(--shadow-lg); border: 1.5px solid var(--primary); animation: tutPop .22s ease; display: flex; flex-direction: column; overflow: hidden; }
 .tut-tip-center { border-radius: 30px; }
 @keyframes tutPop { from { transform: scale(.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 /* langer, geschwungener Pfeil von der Blase zum Ziel */
@@ -2012,10 +2012,11 @@ select.input-field {
 .tut-arrow-head { fill: none; stroke: var(--primary); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 3px rgba(0,0,0,.55)); opacity: 0; animation: tutFade .25s ease .35s forwards; }
 @keyframes tutDraw { to { stroke-dashoffset: 0; } }
 @keyframes tutFade { to { opacity: 1; } }
-.tut-progress { font-size: 11px; font-weight: 800; color: var(--primary); letter-spacing: .02em; margin-bottom: 5px; }
-.tut-tip h4 { margin: 0 0 5px; font-size: 16px; font-weight: 800; color: var(--text); }
-.tut-tip p { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--text-muted); }
-.tut-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; gap: 10px; }
+.tut-progress { flex: 0 0 auto; font-size: 11px; font-weight: 800; color: var(--primary); letter-spacing: .02em; margin-bottom: 5px; }
+.tut-tip h4 { flex: 0 0 auto; margin: 0 0 5px; font-size: 16px; font-weight: 800; color: var(--text); }
+/* langer Text scrollt INNERHALB der Blase → die Buttons werden nie aus dem Bild geschoben */
+.tut-tip p { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--text-muted); }
+.tut-actions { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; margin-top: 14px; gap: 10px; }
 .tut-skip { background: none; border: none; color: var(--text-muted); font-size: 13px; font-weight: 600; cursor: pointer; padding: 6px 2px; }
 .tut-next { background: var(--grad-primary); color: #fff; border: none; border-radius: 999px; font-weight: 800; font-size: 14px; padding: 10px 24px; cursor: pointer; box-shadow: var(--shadow-primary); }
 .tut-next:active { transform: scale(.97); }

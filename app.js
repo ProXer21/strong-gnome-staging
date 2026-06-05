@@ -1,7 +1,7 @@
 'use strict';
 
 // App-Version (bei jedem Release hochzählen — auch in index.html/sw.js Cache-Buster)
-const APP_VERSION = 'v1.2.0';
+const APP_VERSION = 'v1.2.1';
 
 // ─── Konstanten ─────────────────────────────────────────────────────────────
 
@@ -3507,19 +3507,27 @@ function tutorialRender() {
       spot = `<div class="tut-spotlight" style="left:${rect.left - pad}px;top:${rect.top - pad}px;width:${rect.width + pad * 2}px;height:${rect.height + pad * 2}px"></div>`;
     }
 
-    // runde Blase, mit großzügigem Abstand zum Ziel (Platz für den langen, geschwungenen Pfeil)
+    // runde Blase, mit Abstand zum Ziel (Platz für den Pfeil). WICHTIG: Höhe immer auf den
+    // sichtbaren Bereich begrenzen (max-height) + langer Text scrollt intern → die Aktions-
+    // Buttons („Weiter"/„Überspringen") sind IMMER sichtbar und klickbar (nie aus dem Bild geschoben).
     let centered = false, tipStyle = '', below = false;
-    const gap = 72;
+    const safe = 14;                                   // Sicherheitsabstand zum Bildschirmrand
+    const gap = Math.max(28, Math.min(72, Math.round(vh * 0.07)));   // auf kurzen Screens kleiner
     if (!rect) {
       centered = true;
-      tipStyle = `width:${Math.min(320, vw - 32)}px;left:50%;top:50%;transform:translate(-50%,-50%);`;
+      tipStyle = `width:${Math.min(320, vw - 32)}px;left:50%;top:50%;transform:translate(-50%,-50%);max-height:${vh - 2 * safe}px;`;
     } else {
       const tipW = Math.min(290, vw - 24);
       let left = rect.left + rect.width / 2 - tipW / 2;
       left = Math.max(12, Math.min(left, vw - tipW - 12));
       below = rect.top < vh / 2;   // Ziel oben → Blase darunter
-      if (below) tipStyle = `width:${tipW}px;left:${left}px;top:${Math.min(rect.bottom + gap, vh - 220)}px;`;
-      else       tipStyle = `width:${tipW}px;left:${left}px;bottom:${Math.min(vh - rect.top + gap, vh - 200)}px;`;
+      if (below) {
+        let top = Math.max(safe, Math.min(rect.bottom + gap, vh - 170));   // genug Rest für die Buttons
+        tipStyle = `width:${tipW}px;left:${left}px;top:${top}px;max-height:${vh - top - safe}px;`;
+      } else {
+        let b = Math.max(safe, Math.min(vh - rect.top + gap, vh - 170));
+        tipStyle = `width:${tipW}px;left:${left}px;bottom:${b}px;max-height:${vh - b - safe}px;`;
+      }
     }
 
     root.className = 'tut-on' + (rect ? '' : ' tut-dim');
