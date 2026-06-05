@@ -1,7 +1,7 @@
 'use strict';
 
 // App-Version (bei jedem Release hochzählen — auch in index.html/sw.js Cache-Buster)
-const APP_VERSION = 'v1.1.0';
+const APP_VERSION = 'v1.2.0';
 
 // ─── Konstanten ─────────────────────────────────────────────────────────────
 
@@ -1237,6 +1237,7 @@ function finishWorkout() {
   clearInterval(window._sessTimer);
   stopRest(false);
   syncPublicProfile();   // letztes Training / Fortschritt für Freunde aktualisieren
+  bumpPublicStat({ workouts: INC(1) });   // öffentlicher Workout-Zähler
   showToast('🎉 Training gespeichert!');
   setTimeout(() => navigate('dashboard'), 1200);
 }
@@ -1789,6 +1790,16 @@ function syncPublicProfile() {
     lastWorkout, workoutsThisMonth, plans, updatedAt: Date.now(),
   }, { merge: true }).catch(() => {});
 }
+
+// Öffentlicher, anonymer Zähler (stats/public) fürs Roadmap-„Nutzung"-Panel.
+// Enthält NUR aggregierte Zahlen (Nutzer-/Workout-Anzahl, Zeitpunkt) — keine PII.
+function bumpPublicStat(updates) {
+  try {
+    if (!socialAvailable() || typeof firebase === 'undefined' || !firebase.firestore || !firebase.firestore.FieldValue) return;
+    fsdb().collection('stats').doc('public').set(updates, { merge: true }).catch(() => {});
+  } catch (e) {}
+}
+function INC(n) { return firebase.firestore.FieldValue.increment(n || 1); }
 
 // Echtzeit-Listener für Anfragen / Posteingang → Badge + Live-Update der Seite
 function startSocialListeners() {
@@ -2368,6 +2379,11 @@ function saveOnboarding() {
   saveData(data);
   applyTheme(data.settings.theme);
   notifySignup(name);   // Entwickler per E-Mail über neue Registrierung informieren
+  // öffentlicher Nutzer-Zähler — pro Konto nur einmal
+  try {
+    const k = 'statUserCounted_' + (currentUid || 'local');
+    if (!localStorage.getItem(k)) { localStorage.setItem(k, '1'); bumpPublicStat({ users: INC(1), lastSignup: Date.now() }); }
+  } catch (e) {}
   enterApp();
   showToast(`Willkommen, ${name}! 💪`);
 }
@@ -2409,6 +2425,8 @@ function nutToday() { return nutISO(new Date()); }
 
 let nutDate = nutToday();       // aktuell angezeigter Tag (YYYY-MM-DD, lokale Zeit)
 let nutModalMeal = null;        // Mahlzeit, zu der gerade hinzugefügt wird
+let nutPer100 = null;           // „je 100 g"-Referenz eines gewählten Datenbank-Produkts
+let _offTimer = null;           // Debounce-Timer für die Open-Food-Facts-Suche
 
 // Sinnvolle Obergrenzen pro EINTRAG (verhindert absurde Eingaben + Zahlen-Overflow im UI)
 const NUT_MAX_KCAL = 10000;     // kcal je Eintrag (eine riesige Mahlzeit ~3000)
@@ -2561,11 +2579,66 @@ function renderNutrition() {
   if (gi) gi.textContent = data.nutrition.goals.mode === 'auto'
     ? `Automatisches Ziel: ${nutFmt(goals.kcal)} kcal/Tag`
     : `Manuelles Ziel: ${nutFmt(goals.kcal)} kcal/Tag`;
+
+  renderNutWeek(data, goals);
+}
+
+let nutWeekChart = null;
+// 7-Tage-Statistik: Ø kcal, erfasste Tage, am-Ziel-Tage, Balkenchart + Ø-Makros
+function renderNutWeek(data, goals) {
+  const card = document.getElementById('nut-stats'); if (!card) return;
+  // letzte 7 Tage (heute zurück)
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const dt = new Date(); dt.setDate(dt.getDate() - i);
+    const iso = nutISO(dt);
+    const t = nutDayTotals(data, iso);
+    days.push({ iso, label: dt.toLocaleDateString('de-DE', { weekday: 'short' }).replace('.', ''), ...t });
+  }
+  const logged = days.filter(d => d.kcal > 0);
+  if (!logged.length) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+
+  const avg = Math.round(logged.reduce((s, d) => s + d.kcal, 0) / logged.length);
+  const onTarget = logged.filter(d => goals.kcal > 0 && d.kcal <= goals.kcal * 1.05).length;
+  document.getElementById('nws-avg').textContent = nutFmt(avg);
+  document.getElementById('nws-days').textContent = logged.length + '/7';
+  document.getElementById('nws-streak').textContent = onTarget + '/' + logged.length;
+
+  const mAvg = k => Math.round(logged.reduce((s, d) => s + d[k], 0) / logged.length);
+  const mw = document.getElementById('nws-macros');
+  if (mw) mw.innerHTML = MACROS.map(m => `<span class="nws-m"><b style="color:${m.color}">${nutFmt(mAvg(m.key))} g</b> ${m.label}</span>`).join('');
+
+  const cv = document.getElementById('nut-week-chart');
+  if (cv && typeof Chart !== 'undefined') {
+    if (nutWeekChart) nutWeekChart.destroy();
+    const css = getComputedStyle(document.documentElement);
+    const primary = css.getPropertyValue('--primary').trim() || '#c42e86';
+    const danger = css.getPropertyValue('--danger').trim() || '#c0392b';
+    const muted = css.getPropertyValue('--text-muted').trim() || '#888';
+    const grid = css.getPropertyValue('--border').trim() || '#eee';
+    nutWeekChart = new Chart(cv, {
+      type: 'bar',
+      data: { labels: days.map(d => d.label),
+        datasets: [{ data: days.map(d => Math.round(d.kcal)),
+          backgroundColor: days.map(d => (goals.kcal > 0 && d.kcal > goals.kcal * 1.05) ? danger : primary),
+          borderRadius: 6, maxBarThickness: 34 }] },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false },
+          tooltip: { callbacks: { label: c => nutFmt(c.raw) + ' kcal' } } },
+        scales: {
+          y: { beginAtZero: true, grid: { color: grid }, ticks: { color: muted, font: { size: 10 }, callback: v => v >= 1000 ? (v / 1000) + 'k' : v } },
+          x: { grid: { display: false }, ticks: { color: muted, font: { size: 11 } } } },
+        // Ziel-Linie
+        ...(goals.kcal > 0 ? {} : {}) }
+    });
+  }
 }
 
 // ── Lebensmittel hinzufügen / bearbeiten (Modal) ──
 function openFoodModal(meal, entryId) {
   nutModalMeal = meal;
+  nutPer100 = null;          // ggf. aktive „je 100 g"-Referenz zurücksetzen
   const data = loadData();
   const editing = entryId ? data.nutrition.log.find(e => e.id === entryId) : null;
   const root = document.getElementById('nut-modal-root');
@@ -2586,6 +2659,16 @@ function openFoodModal(meal, entryId) {
         <h3>${editing ? 'Eintrag bearbeiten' : 'Hinzufügen'}</h3>
         <button class="modal-x" onclick="closeFoodModal()" aria-label="Schließen">✕</button>
       </div>
+      ${editing ? '' : `
+      <div class="off-search">
+        <div class="off-row">
+          <input id="nf-search" class="input-field" type="search" autocomplete="off" placeholder="🔎 Lebensmittel suchen (Datenbank)…" oninput="nutSearchOFF()">
+          <button type="button" class="off-scan" onclick="nutScanBarcode()" aria-label="Barcode scannen" title="Barcode scannen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5v14"/><path d="M7 5v14"/><path d="M11 5v14"/><path d="M15 5v14"/><path d="M19 5v14"/><path d="M21 5v14"/></svg>
+          </button>
+        </div>
+        <div id="nf-search-results" class="off-results"></div>
+      </div>`}
       ${editing || !savedFoods.length ? '' : `
       <div class="saved-foods-block">
         <div class="sfb-label">Meine Lebensmittel</div>
@@ -2605,13 +2688,18 @@ function openFoodModal(meal, entryId) {
           <input id="nf-name" class="input-field" type="text" list="nf-foodlist" autocomplete="off" maxlength="${NUT_MAX_NAME}" oninput="nutNameSuggest()" placeholder="z. B. Haferflocken mit Milch" value="${editing ? escapeHtml(editing.name || '') : ''}">
           <datalist id="nf-foodlist">${dataListOptions}</datalist>
         </label>
+        <div id="nf-grams-wrap" style="display:none">
+          <label>Menge (g) <span class="grams-hint">— Werte aus der Datenbank skalieren mit</span>
+            <input id="nf-grams" class="input-field" type="number" inputmode="decimal" min="0" max="5000" placeholder="100" oninput="nutGramsRecalc()">
+          </label>
+        </div>
         <label>Kalorien (kcal)
-          <input id="nf-kcal" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_KCAL}" placeholder="0" value="${editing ? (editing.kcal ?? '') : ''}">
+          <input id="nf-kcal" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_KCAL}" placeholder="0" oninput="nutManualEdit()" value="${editing ? (editing.kcal ?? '') : ''}">
         </label>
         <div class="macro-inputs">
-          <label>Eiweiß (g)<input id="nf-protein" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_MACRO}" placeholder="0" value="${editing ? (editing.protein ?? '') : ''}"></label>
-          <label>KH (g)<input id="nf-carbs" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_MACRO}" placeholder="0" value="${editing ? (editing.carbs ?? '') : ''}"></label>
-          <label>Fett (g)<input id="nf-fat" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_MACRO}" placeholder="0" value="${editing ? (editing.fat ?? '') : ''}"></label>
+          <label>Eiweiß (g)<input id="nf-protein" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_MACRO}" placeholder="0" oninput="nutManualEdit()" value="${editing ? (editing.protein ?? '') : ''}"></label>
+          <label>KH (g)<input id="nf-carbs" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_MACRO}" placeholder="0" oninput="nutManualEdit()" value="${editing ? (editing.carbs ?? '') : ''}"></label>
+          <label>Fett (g)<input id="nf-fat" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_MACRO}" placeholder="0" oninput="nutManualEdit()" value="${editing ? (editing.fat ?? '') : ''}"></label>
         </div>
         ${editing ? '' : `<label class="chk"><input type="checkbox" id="nf-save"> In „Meine Lebensmittel" speichern</label>`}
       </div>
@@ -2625,9 +2713,10 @@ function openFoodModal(meal, entryId) {
 }
 
 function closeFoodModal() {
+  if (typeof nutStopScan === 'function') nutStopScan();   // evtl. laufenden Kamera-Scan beenden
   const root = document.getElementById('nut-modal-root');
   if (root) root.innerHTML = '';
-  nutModalMeal = null;
+  nutModalMeal = null; nutPer100 = null;
   document.body.classList.remove('nut-modal-open');   // Hintergrund-Scroll wieder freigeben
 }
 
@@ -2656,6 +2745,114 @@ function nutNameSuggest() {
   if (!f) return;
   const set = (i, v) => { const el = document.getElementById(i); if (el) el.value = (v ?? 0); };
   set('nf-kcal', f.kcal); set('nf-protein', f.protein); set('nf-carbs', f.carbs); set('nf-fat', f.fat);
+}
+
+// ── Open Food Facts: Lebensmittel-Suche (gratis, keine Anmeldung nötig) ──
+function nutSearchOFF() {
+  clearTimeout(_offTimer);
+  const q = (document.getElementById('nf-search')?.value || '').trim();
+  const box = document.getElementById('nf-search-results');
+  if (!box) return;
+  if (q.length < 3) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="off-msg">Suche…</div>';
+  _offTimer = setTimeout(async () => {
+    try {
+      const url = 'https://world.openfoodfacts.org/cgi/search.pl?search_terms=' + encodeURIComponent(q) +
+        '&search_simple=1&action=process&json=1&page_size=20&fields=product_name,brands,nutriments,code';
+      const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 9000);
+      const r = await fetch(url, { signal: ctrl.signal }); clearTimeout(to);
+      const d = await r.json();
+      const items = (d.products || []).filter(p => p.product_name && p.nutriments && p.nutriments['energy-kcal_100g'] != null);
+      if (!items.length) { box.innerHTML = '<div class="off-msg">Nichts gefunden — gib die Werte unten manuell ein.</div>'; return; }
+      window._offCache = {};
+      box.innerHTML = items.slice(0, 14).map((p, i) => {
+        const n = p.nutriments; const id = 'off' + i;
+        window._offCache[id] = { name: p.product_name, brand: (p.brands || '').split(',')[0].trim(),
+          kcal: Math.round(n['energy-kcal_100g'] || 0), protein: +n.proteins_100g || 0, carbs: +n.carbohydrates_100g || 0, fat: +n.fat_100g || 0 };
+        const f = window._offCache[id];
+        return `<button type="button" class="off-item" onclick="nutPickOFF('${id}')">
+          <span class="oi-name">${escapeHtml(p.product_name)}${f.brand ? ' · ' + escapeHtml(f.brand) : ''}</span>
+          <span class="oi-kcal">${f.kcal} kcal<small>/100g</small></span></button>`;
+      }).join('');
+    } catch (e) {
+      box.innerHTML = '<div class="off-msg">Keine Verbindung zur Datenbank — bitte manuell eingeben.</div>';
+    }
+  }, 450);
+}
+
+// Datenbank-Treffer übernehmen → „je 100 g"-Referenz setzen, Menge-Feld zeigen
+function nutPickOFF(id) {
+  const f = (window._offCache || {})[id]; if (!f) return;
+  nutPer100 = { kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat };
+  const set = (i, v) => { const el = document.getElementById(i); if (el) el.value = v; };
+  set('nf-name', f.name + (f.brand ? ' (' + f.brand + ')' : ''));
+  const gw = document.getElementById('nf-grams-wrap'); if (gw) gw.style.display = 'block';
+  set('nf-grams', 100);
+  nutGramsRecalc();
+  const box = document.getElementById('nf-search-results'); if (box) box.innerHTML = '';
+  const s = document.getElementById('nf-search'); if (s) s.value = '';
+}
+
+// Menge (g) ändern → kcal/Makros aus der je-100g-Referenz neu berechnen
+function nutGramsRecalc() {
+  if (!nutPer100) return;
+  const g = parseFloat(document.getElementById('nf-grams')?.value) || 0; const fac = g / 100;
+  const set = (i, v) => { const el = document.getElementById(i); if (el) el.value = Math.round(v * fac); };
+  set('nf-kcal', nutPer100.kcal); set('nf-protein', nutPer100.protein); set('nf-carbs', nutPer100.carbs); set('nf-fat', nutPer100.fat);
+}
+
+// Manuelles Bearbeiten eines Wertfelds hebt die Datenbank-Skalierung auf
+function nutManualEdit() { nutPer100 = null; }
+
+// ── Barcode-Scan (Web · BarcodeDetector, falls verfügbar) ──
+async function nutScanBarcode() {
+  const root = document.getElementById('nut-modal-root');
+  if (!('BarcodeDetector' in window)) {
+    showToast('Barcode-Scan klappt am besten in der App — hier bitte suchen/manuell', '#c46a04');
+    return;
+  }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { showToast('Keine Kamera verfügbar', '#c46a04'); return; }
+  // Scanner-Overlay
+  const ov = document.createElement('div'); ov.className = 'scan-overlay'; ov.id = 'scan-overlay';
+  ov.innerHTML = `<div class="scan-box"><video id="scan-video" playsinline></video><div class="scan-line"></div></div>
+    <p class="scan-hint">Barcode in den Rahmen halten…</p>
+    <button class="scan-cancel" onclick="nutStopScan()">Abbrechen</button>`;
+  document.body.appendChild(ov);
+  try {
+    const detector = new window.BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'] });
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    window._scanStream = stream;
+    const vid = document.getElementById('scan-video'); vid.srcObject = stream; await vid.play();
+    window._scanLoop = setInterval(async () => {
+      try {
+        const codes = await detector.detect(vid);
+        if (codes && codes.length) { const code = codes[0].rawValue; nutStopScan(); nutLookupBarcode(code); }
+      } catch (e) {}
+    }, 500);
+  } catch (e) {
+    nutStopScan();
+    showToast('Kamera-Zugriff abgelehnt', '#c0392b');
+  }
+}
+function nutStopScan() {
+  clearInterval(window._scanLoop);
+  if (window._scanStream) { window._scanStream.getTracks().forEach(t => t.stop()); window._scanStream = null; }
+  document.getElementById('scan-overlay')?.remove();
+}
+async function nutLookupBarcode(code) {
+  showToast('Barcode ' + code + ' — suche Produkt…');
+  try {
+    const r = await fetch('https://world.openfoodfacts.org/api/v2/product/' + encodeURIComponent(code) + '.json?fields=product_name,brands,nutriments');
+    const d = await r.json();
+    const p = d.product;
+    if (!p || !p.nutriments || p.nutriments['energy-kcal_100g'] == null) { showToast('Produkt nicht gefunden — bitte manuell', '#c46a04'); return; }
+    const n = p.nutriments;
+    window._offCache = window._offCache || {};
+    window._offCache.bc = { name: p.product_name || ('Produkt ' + code), brand: (p.brands || '').split(',')[0].trim(),
+      kcal: Math.round(n['energy-kcal_100g'] || 0), protein: +n.proteins_100g || 0, carbs: +n.carbohydrates_100g || 0, fat: +n.fat_100g || 0 };
+    nutPickOFF('bc');
+    showToast('✓ ' + (p.product_name || 'Produkt') + ' gefunden', '#0f9d72');
+  } catch (e) { showToast('Keine Verbindung zur Datenbank', '#c0392b'); }
 }
 
 // Löscht das aktuell im Dropdown gewählte gespeicherte Lebensmittel
@@ -2839,7 +3036,7 @@ const TUTORIAL_STEPS = [
   { page: 'dashboard', target: '#dash-nut', title: 'Deine Kalorien heute',
     text: 'Diese Karte zeigt dir auf einen Blick, wie viele Kalorien du heute schon gegessen hast und wie viele noch übrig sind. Tippe darauf, um direkt zur Ernährung zu kommen.' },
   { page: 'nutrition', target: '.nut-summary', title: 'Essen & Kalorien tracken',
-    text: 'Das ist deine Ernährungs-Seite. Der Bogen zeigt deine Kalorien, darunter Eiweiß, Kohlenhydrate und Fett. Mit „+ Hinzufügen" trägst du Mahlzeiten ein, über das Zahnrad oben rechts legst du dein Tagesziel fest.' },
+    text: 'Deine Ernährungs-Seite. Der Bogen zeigt die Kalorien, darunter Eiweiß/Kohlenhydrate/Fett. Mit „+ Hinzufügen" trägst du Mahlzeiten ein — entweder per Datenbank-Suche, Barcode-Scan oder von Hand. Ganz unten siehst du deinen 7-Tage-Verlauf, über das Zahnrad oben rechts dein Tagesziel.' },
   { page: 'training', target: '#routine-list .routine-card', title: 'Training & Workouts',
     text: 'Hier sind deine Trainingspläne. Tippe einen Plan an, um ein Workout zu starten — dann trägst du Gewicht, Wiederholungen und Sätze ein. Pläne kannst du frei anpassen oder neue anlegen.' },
   { page: 'history', target: '#page-history .page-header', title: 'Dein Verlauf',

@@ -33,7 +33,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
-  <link rel="stylesheet" href="./style.css?v=38" />
+  <link rel="stylesheet" href="./style.css?v=39" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -686,6 +686,18 @@
   <!-- Mahlzeiten -->
   <div id="nut-meals"></div>
 
+  <!-- 7-Tage-Statistik -->
+  <div class="card nut-stats" id="nut-stats" style="display:none">
+    <div class="card-title">📈 Letzte 7 Tage</div>
+    <div class="ns-row">
+      <div class="ns-stat"><div class="nss-val" id="nws-avg">—</div><div class="nss-lbl">Ø kcal/Tag</div></div>
+      <div class="ns-stat"><div class="nss-val" id="nws-days">—</div><div class="nss-lbl">Tage erfasst</div></div>
+      <div class="ns-stat"><div class="nss-val" id="nws-streak">—</div><div class="nss-lbl">am Ziel</div></div>
+    </div>
+    <div class="nws-chart"><canvas id="nut-week-chart" height="150"></canvas></div>
+    <div class="nws-macros" id="nws-macros"></div>
+  </div>
+
   <div class="app-version">Strong Gnome</div>
 </section>
 
@@ -732,6 +744,6 @@
   </button>
 </nav>
 
-<script src="./app.js?v=52"></script>
+<script src="./app.js?v=53"></script>
 </body>
 </html>

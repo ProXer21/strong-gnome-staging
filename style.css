@@ -1984,3 +1984,39 @@ select.input-field {
 .tut-skip { background: none; border: none; color: var(--text-muted); font-size: 13px; font-weight: 600; cursor: pointer; padding: 6px 2px; }
 .tut-next { background: var(--grad-primary); color: #fff; border: none; border-radius: 999px; font-weight: 800; font-size: 14px; padding: 10px 24px; cursor: pointer; box-shadow: var(--shadow-primary); }
 .tut-next:active { transform: scale(.97); }
+
+/* ─── Ernährung: Datenbank-Suche + Barcode-Scan (v1.2) ──────────────────────── */
+.off-search { margin-bottom: 12px; }
+.off-row { display: flex; gap: 8px; align-items: stretch; }
+.off-row .input-field { flex: 1; min-width: 0; }
+.off-scan { flex: 0 0 auto; width: 48px; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); color: var(--primary); cursor: pointer; }
+.off-scan svg { width: 22px; height: 22px; }
+.off-scan:active { border-color: var(--primary); }
+.off-results { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; max-height: 230px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.off-results:empty { margin-top: 0; }
+.off-msg { font-size: 13px; color: var(--text-muted); padding: 8px 2px; }
+.off-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); cursor: pointer; text-align: left; }
+.off-item:active { border-color: var(--primary); background: var(--primary-50); }
+.oi-name { flex: 1; font-weight: 600; font-size: 13.5px; color: var(--text); line-height: 1.3; }
+.oi-kcal { font-size: 13px; font-weight: 800; color: var(--primary); white-space: nowrap; }
+.oi-kcal small { font-weight: 600; color: var(--text-muted); font-size: 10px; }
+.grams-hint { font-weight: 600; color: var(--text-muted); font-size: 11px; }
+
+/* Barcode-Scanner-Overlay */
+.scan-overlay { position: fixed; inset: 0; z-index: 700; background: rgba(0,0,0,.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; }
+.scan-box { position: relative; width: min(80vw, 320px); aspect-ratio: 1.3; border-radius: 18px; overflow: hidden; box-shadow: 0 0 0 3px var(--primary), 0 0 30px rgba(0,0,0,.6); }
+.scan-box video { width: 100%; height: 100%; object-fit: cover; }
+.scan-line { position: absolute; left: 8%; right: 8%; top: 50%; height: 2px; background: var(--primary); box-shadow: 0 0 12px 2px var(--primary); animation: scanMove 1.8s ease-in-out infinite; }
+@keyframes scanMove { 0%,100% { top: 22%; } 50% { top: 78%; } }
+.scan-hint { color: #fff; font-weight: 700; font-size: 15px; }
+.scan-cancel { background: rgba(255,255,255,.14); color: #fff; border: 1.5px solid rgba(255,255,255,.4); border-radius: 999px; font-weight: 800; padding: 11px 28px; cursor: pointer; }
+
+/* Ernährung: 7-Tage-Statistik */
+.nut-stats .ns-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 6px 0 14px; }
+.ns-stat { text-align: center; }
+.nss-val { font-size: 20px; font-weight: 900; color: var(--text); }
+.nss-lbl { font-size: 11px; color: var(--text-muted); font-weight: 600; margin-top: 2px; }
+.nws-chart { height: 150px; position: relative; }
+.nws-macros { display: flex; justify-content: space-around; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.nws-m { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+.nws-m b { font-weight: 800; }
