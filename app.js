@@ -1,7 +1,7 @@
 'use strict';
 
 // App-Version (bei jedem Release hochzählen — auch in index.html/sw.js Cache-Buster)
-const APP_VERSION = 'v1.2.1';
+const APP_VERSION = 'v1.3.0';
 
 // ─── Konstanten ─────────────────────────────────────────────────────────────
 
@@ -3208,38 +3208,69 @@ function nutGramsRecalc() {
 // Manuelles Bearbeiten eines Wertfelds hebt die Datenbank-Skalierung auf
 function nutManualEdit() { nutPer100 = null; }
 
-// ── Barcode-Scan (Web · BarcodeDetector, falls verfügbar) ──
+// ── Barcode-Scan ──
+// Nativer Web-BarcodeDetector wo verfügbar (z. B. Android/Chrome); sonst ZXing-js
+// als Decoder-Fallback — iOS Safari hat KEIN BarcodeDetector. Beide Wege nutzen
+// dasselbe Overlay und dieselbe Open-Food-Facts-Suche (nutLookupBarcode).
+function nutLoadZXing() {
+  if (window.ZXing) return Promise.resolve();
+  if (window._zxingPromise) return window._zxingPromise;
+  window._zxingPromise = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
+    s.onload = res;
+    s.onerror = () => { window._zxingPromise = null; rej(new Error('zxing-load-failed')); };
+    document.head.appendChild(s);
+  });
+  return window._zxingPromise;
+}
+
 async function nutScanBarcode() {
-  const root = document.getElementById('nut-modal-root');
-  if (!('BarcodeDetector' in window)) {
-    showToast('Barcode-Scan klappt am besten in der App — hier bitte suchen/manuell', '#c46a04');
-    return;
-  }
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { showToast('Keine Kamera verfügbar', '#c46a04'); return; }
-  // Scanner-Overlay
+  // Scanner-Overlay (für beide Decoder identisch)
   const ov = document.createElement('div'); ov.className = 'scan-overlay'; ov.id = 'scan-overlay';
-  ov.innerHTML = `<div class="scan-box"><video id="scan-video" playsinline></video><div class="scan-line"></div></div>
+  ov.innerHTML = `<div class="scan-box"><video id="scan-video" playsinline muted></video><div class="scan-line"></div></div>
     <p class="scan-hint">Barcode in den Rahmen halten…</p>
     <button class="scan-cancel" onclick="nutStopScan()">Abbrechen</button>`;
   document.body.appendChild(ov);
+  const vid = document.getElementById('scan-video');
   try {
-    const detector = new window.BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'] });
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-    window._scanStream = stream;
-    const vid = document.getElementById('scan-video'); vid.srcObject = stream; await vid.play();
-    window._scanLoop = setInterval(async () => {
-      try {
-        const codes = await detector.detect(vid);
-        if (codes && codes.length) { const code = codes[0].rawValue; nutStopScan(); nutLookupBarcode(code); }
-      } catch (e) {}
-    }, 500);
+    if ('BarcodeDetector' in window) {
+      // Nativer Web-Decoder (schnell)
+      const detector = new window.BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'] });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      window._scanStream = stream;
+      vid.srcObject = stream; await vid.play();
+      window._scanLoop = setInterval(async () => {
+        try {
+          const codes = await detector.detect(vid);
+          if (codes && codes.length) { const code = codes[0].rawValue; nutStopScan(); nutLookupBarcode(code); }
+        } catch (e) {}
+      }, 500);
+    } else {
+      // Fallback: ZXing-js (iOS Safari u. a.) — eigener Stream über decodeFromConstraints
+      await nutLoadZXing();
+      const hints = new Map();
+      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+        ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
+        ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E, ZXing.BarcodeFormat.CODE_128
+      ]);
+      const reader = new ZXing.BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 200 });
+      window._zxingReader = reader;
+      await reader.decodeFromConstraints({ video: { facingMode: 'environment' } }, vid, (result) => {
+        if (result) { const code = result.getText(); nutStopScan(); nutLookupBarcode(code); }
+      });
+    }
   } catch (e) {
     nutStopScan();
-    showToast('Kamera-Zugriff abgelehnt', '#c0392b');
+    if (e && e.message === 'zxing-load-failed') showToast('Scanner konnte nicht geladen werden — bitte online erneut versuchen', '#c46a04');
+    else showToast('Kamera-Zugriff abgelehnt', '#c0392b');
   }
 }
+
 function nutStopScan() {
-  clearInterval(window._scanLoop);
+  clearInterval(window._scanLoop); window._scanLoop = null;
+  if (window._zxingReader) { try { window._zxingReader.reset(); } catch (e) {} window._zxingReader = null; }
   if (window._scanStream) { window._scanStream.getTracks().forEach(t => t.stop()); window._scanStream = null; }
   document.getElementById('scan-overlay')?.remove();
 }
