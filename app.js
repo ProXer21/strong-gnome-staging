@@ -2662,8 +2662,9 @@ function openFoodModal(meal, entryId) {
       </div>
       ${editing ? '' : `
       <div class="off-search">
+        <div class="off-sec-label">Suchen oder Barcode scannen</div>
         <div class="off-row">
-          <input id="nf-search" class="input-field" type="search" autocomplete="off" placeholder="🔎 Lebensmittel suchen (Datenbank)…" oninput="nutSearchOFF()">
+          <input id="nf-search" class="input-field" type="search" autocomplete="off" placeholder="🔎 Lebensmittel suchen…" oninput="nutSearchOFF()">
           <button type="button" class="off-scan" onclick="nutScanBarcode()" aria-label="Barcode scannen" title="Barcode scannen">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5v14"/><path d="M7 5v14"/><path d="M11 5v14"/><path d="M15 5v14"/><path d="M19 5v14"/><path d="M21 5v14"/></svg>
           </button>

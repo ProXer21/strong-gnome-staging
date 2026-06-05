@@ -2025,3 +2025,36 @@ select.input-field {
 .menge-row { display: flex; gap: 8px; align-items: stretch; }
 .menge-row .input-field:first-child { flex: 1; min-width: 0; }
 .menge-row select.input-field { flex: 0 0 auto; width: 150px; padding-right: 30px; }
+
+/* ─── Hinzufügen-Dialog: Feinschliff (v1.2) ─────────────────────────────────── */
+.modal-sheet { padding: 20px 18px 16px; }
+.modal-head { margin-bottom: 16px; }
+.modal-head h3 { font-size: 19px; font-weight: 800; letter-spacing: -.01em; }
+.modal-x { width: 34px; height: 34px; font-size: 15px; transition: background .15s, color .15s; }
+.modal-x:active { background: var(--primary-50); color: var(--primary); }
+
+/* Such-/Scan-Block als sanft abgesetzte Karte */
+.off-search { background: var(--bg); border: 1px solid var(--border); border-radius: 16px; padding: 13px 13px 11px; margin-bottom: 14px; }
+.off-sec-label { font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 9px; }
+.off-search .input-field { background: var(--surface); }
+.off-scan { width: 50px; background: var(--surface); }
+.off-scan:active { background: var(--primary-50); }
+
+/* Suchergebnisse: klare, tappbare Karten mit kcal-Pille */
+.off-item { border-radius: 14px; padding: 11px 13px; background: var(--surface); transition: border-color .12s, transform .08s; }
+.off-item:active { transform: scale(.99); }
+.oi-kcal { background: var(--primary-50); color: var(--primary); padding: 4px 10px; border-radius: 999px; font-size: 12px; }
+.oi-kcal small { font-size: 9px; }
+[data-theme="masc"] .oi-kcal, [data-theme="dark"] .oi-kcal { background: rgba(255,255,255,.07); }
+
+/* Makro-Felder mit Farbakzent (passend zum Bogen-Gauge) */
+.macro-inputs > label:nth-child(1) .input-field { border-bottom: 2.5px solid var(--primary); }
+.macro-inputs > label:nth-child(2) .input-field { border-bottom: 2.5px solid var(--amber); }
+.macro-inputs > label:nth-child(3) .input-field { border-bottom: 2.5px solid var(--mint); }
+.macro-inputs > label { color: var(--text); }
+
+/* kcal-Feld als Hauptwert betonen */
+#nf-kcal { font-size: 21px; font-weight: 800; }
+
+.modal-divider { margin: 16px 0 14px; }
+.modal-form > label { gap: 7px; }
