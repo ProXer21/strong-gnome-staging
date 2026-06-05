@@ -2636,88 +2636,211 @@ function renderNutWeek(data, goals) {
   }
 }
 
-// ── Lebensmittel hinzufügen / bearbeiten (Modal) ──
+// ── Lebensmittel hinzufügen / bearbeiten ──
 function openFoodModal(meal, entryId) {
   nutModalMeal = meal;
-  nutPer100 = null; nutServingG = null;   // ggf. aktive „je 100 g"-Referenz zurücksetzen
+  nutPer100 = null; nutServingG = null;
   const data = loadData();
   const editing = entryId ? data.nutrition.log.find(e => e.id === entryId) : null;
   const root = document.getElementById('nut-modal-root');
   if (!root) return;
-  document.body.classList.add('nut-modal-open');   // Hintergrund-Scroll sperren
+  document.body.classList.add('nut-modal-open');
+  if (editing) { renderFoodEditSheet(editing); return; }   // Bearbeiten = kompaktes Sheet
+  renderFoodAddScreen(meal);                                // Neu = Vollbild-Suche
+}
 
-  const savedFoods = data.nutrition.foods.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', 'de'));
-  // Dropdown-Optionen (kompakt, egal wie viele gespeichert sind)
-  const savedOptions = savedFoods.map(f =>
-    `<option value="${f.id}">${escapeHtml(f.name)} · ${Math.round(f.kcal || 0)} kcal</option>`).join('');
-  // Tipp-Vorschläge beim Eintippen (datalist)
-  const dataListOptions = savedFoods.map(f => `<option value="${escapeHtml(f.name)}">`).join('');
+const FS_ICONS = {
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>',
+  barcode: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5v14"/><path d="M7 5v14"/><path d="M11 5v14"/><path d="M15 5v14"/><path d="M19 5v14"/><path d="M21 5v14"/></svg>',
+  manual: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+};
 
+// Vollbild-Hinzufügen (Suche · Barcode · Manuell) im großen Kachel-Stil
+function renderFoodAddScreen(meal) {
+  const root = document.getElementById('nut-modal-root');
+  const mealLabel = (MEALS.find(m => m.key === meal) || {}).label || 'Mahlzeit';
+  root.innerHTML = `
+  <div class="food-screen" id="food-screen">
+    <div class="fs-top">
+      <button class="fs-x" onclick="closeFoodModal()" aria-label="Schließen">✕</button>
+      <h2>${escapeHtml(mealLabel)}</h2>
+      <span style="width:40px"></span>
+    </div>
+    <div class="fs-methods">
+      <button class="fsm active" id="fsm-search" onclick="foodSetMode('search')"><span class="fsm-ic ic-search">${FS_ICONS.search}</span><span>Suche</span></button>
+      <button class="fsm" onclick="foodSetMode('barcode')"><span class="fsm-ic ic-bc">${FS_ICONS.barcode}</span><span>Barcode</span></button>
+      <button class="fsm" id="fsm-manual" onclick="foodSetMode('manual')"><span class="fsm-ic ic-man">${FS_ICONS.manual}</span><span>Manuell</span></button>
+    </div>
+    <div class="fs-body">
+      <div id="fs-search-pane">
+        <div class="fs-searchbar">
+          <span class="fsb-ic">${FS_ICONS.search}</span>
+          <input id="nf-search" type="search" autocomplete="off" placeholder="Was hattest du zum ${escapeHtml(mealLabel)}?" oninput="nutSearchOFF()">
+        </div>
+        <div id="nf-search-results" class="fs-results"></div>
+      </div>
+      <div id="fs-manual-pane" hidden></div>
+    </div>
+  </div>`;
+  nutQuickList();
+  setTimeout(() => document.getElementById('nf-search')?.focus(), 120);
+}
+
+// Manuelles Eingabe-Formular (für „Manuell"-Tab und das Mengen-Sheet wiederverwendet)
+function foodManualFormHTML(prefill, withGrams) {
+  prefill = prefill || {};
+  return `
+    <div class="modal-form">
+      <label>Bezeichnung
+        <input id="nf-name" class="input-field" type="text" autocomplete="off" maxlength="${NUT_MAX_NAME}" placeholder="z. B. Haferflocken mit Milch" value="${escapeHtml(prefill.name || '')}">
+      </label>
+      <div id="nf-grams-wrap" style="${withGrams ? '' : 'display:none'}">
+        <label>Menge <span class="grams-hint">— Werte skalieren automatisch</span></label>
+        <div class="menge-row">
+          <input id="nf-grams" class="input-field" type="number" inputmode="decimal" min="0" max="5000" placeholder="100" oninput="nutGramsRecalc()">
+          <select id="nf-unit" class="input-field" onchange="nutUnitChange()">
+            <option value="g">g</option>
+            <option value="ml">ml</option>
+            <option value="port" id="nf-unit-port" style="display:none">Portion</option>
+          </select>
+        </div>
+      </div>
+      <label>Kalorien (kcal)
+        <input id="nf-kcal" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_KCAL}" placeholder="0" oninput="nutManualEdit()" value="${prefill.kcal != null ? prefill.kcal : ''}">
+      </label>
+      <div class="macro-inputs">
+        <label>Eiweiß (g)<input id="nf-protein" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_MACRO}" placeholder="0" oninput="nutManualEdit()" value="${prefill.protein != null ? prefill.protein : ''}"></label>
+        <label>KH (g)<input id="nf-carbs" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_MACRO}" placeholder="0" oninput="nutManualEdit()" value="${prefill.carbs != null ? prefill.carbs : ''}"></label>
+        <label>Fett (g)<input id="nf-fat" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_MACRO}" placeholder="0" oninput="nutManualEdit()" value="${prefill.fat != null ? prefill.fat : ''}"></label>
+      </div>
+      <label class="chk"><input type="checkbox" id="nf-save"> In „Meine Lebensmittel" speichern</label>
+    </div>
+    <button class="save-workout-btn" onclick="nutSaveEntry(null)">Hinzufügen</button>`;
+}
+
+// Tab wechseln (Manuell-Formular lazy rendern/leeren → keine doppelten IDs mit dem Mengen-Sheet)
+function foodSetMode(mode) {
+  if (mode === 'barcode') { nutScanBarcode(); return; }   // Scan ist eine Aktion, kein Pane
+  document.querySelectorAll('.fsm').forEach(b => b.classList.remove('active'));
+  document.getElementById(mode === 'manual' ? 'fsm-manual' : 'fsm-search')?.classList.add('active');
+  const sp = document.getElementById('fs-search-pane'), mp = document.getElementById('fs-manual-pane');
+  if (mode === 'manual') {
+    if (mp && !mp.innerHTML.trim()) mp.innerHTML = foodManualFormHTML();
+    if (sp) sp.hidden = true; if (mp) mp.hidden = false;
+    setTimeout(() => document.getElementById('nf-name')?.focus(), 60);
+  } else {
+    if (mp) { mp.hidden = true; mp.innerHTML = ''; }
+    if (sp) sp.hidden = false;
+  }
+}
+
+// Gespeicherte Lebensmittel als Schnellliste (bei leerer Suche)
+function nutQuickList() {
+  const box = document.getElementById('nf-search-results'); if (!box) return;
+  const data = loadData();
+  const foods = data.nutrition.foods.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', 'de'));
+  window._savedCache = {};
+  if (!foods.length) { box.innerHTML = '<div class="fs-hint">Suche ein Lebensmittel oder scanne einen Barcode — oder trage es über „Manuell" ein.</div>'; return; }
+  box.innerHTML = '<div class="fs-listhead">Meine Lebensmittel</div>' + foods.map((f, i) => {
+    const id = 'sv' + i; window._savedCache[id] = f;
+    return foodItemHTML('sv:' + id, f.name, '100 g', Math.round(f.kcal || 0));
+  }).join('');
+}
+
+// Eine Ergebnis-Zeile (Name · Portion · kcal · +)
+function foodItemHTML(ref, name, sub, kcal) {
+  return `<button type="button" class="fs-item" onclick="nutOpenQty('${ref}')">
+    <span class="fi-info"><span class="fi-name">${escapeHtml(name)}</span><span class="fi-sub">${escapeHtml(sub)}</span></span>
+    <span class="fi-kcal">${kcal} kcal</span>
+    <span class="fi-plus" aria-hidden="true">+</span>
+  </button>`;
+}
+
+// Mengen-Sheet für ein gewähltes Lebensmittel (Datenbank-Treffer oder gespeichert)
+function nutOpenQty(ref) {
+  const root = document.getElementById('nut-modal-root');
+  let base = null, servingG = null;
+  if (ref.startsWith('off:')) { const f = (window._offCache || {})[ref.slice(4)]; if (f) { base = f; servingG = (f.servingG > 0 ? f.servingG : null); } }
+  else if (ref.startsWith('sv:')) { const f = (window._savedCache || {})[ref.slice(3)]; if (f) { base = f; servingG = null; } }
+  else if (ref.startsWith('bc:')) { const f = (window._offCache || {}).bc; if (f) { base = f; servingG = (f.servingG > 0 ? f.servingG : null); } }
+  if (!base) return;
+
+  const isDB = ref.startsWith('off:') || ref.startsWith('bc:');   // Datenbank = je 100 g → skalierbar
+  nutPer100 = isDB ? { kcal: base.kcal, protein: base.protein, carbs: base.carbs, fat: base.fat } : null;
+  nutServingG = servingG;
+
+  const sheet = document.createElement('div');
+  sheet.className = 'qty-overlay'; sheet.id = 'qty-overlay';
+  sheet.onclick = e => { if (e.target === sheet) closeQty(); };
+  sheet.innerHTML = `
+    <div class="qty-sheet">
+      <div class="qty-head"><h3>${escapeHtml(base.name + (base.brand ? ' (' + base.brand + ')' : ''))}</h3>
+        <button class="modal-x" onclick="closeQty()" aria-label="Schließen">✕</button></div>
+      ${isDB ? `<div class="menge-row" style="margin-bottom:12px">
+        <input id="nf-grams" class="input-field" type="number" inputmode="decimal" min="0" max="5000" value="${servingG || 100}" oninput="nutGramsRecalc()">
+        <select id="nf-unit" class="input-field" onchange="nutUnitChange()">
+          <option value="g">g</option><option value="ml">ml</option>
+          <option value="port" id="nf-unit-port" ${servingG ? '' : 'style="display:none"'}>${servingG ? 'Portion (' + Math.round(servingG) + ' g)' : 'Portion'}</option>
+        </select></div>` : ''}
+      <div class="qty-vals">
+        <div class="qv kc"><label>Kalorien</label><input id="nf-kcal" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_KCAL}" oninput="nutManualEdit()"></div>
+      </div>
+      <div class="macro-inputs">
+        <label>Eiweiß (g)<input id="nf-protein" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_MACRO}" oninput="nutManualEdit()"></label>
+        <label>KH (g)<input id="nf-carbs" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_MACRO}" oninput="nutManualEdit()"></label>
+        <label>Fett (g)<input id="nf-fat" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_MACRO}" oninput="nutManualEdit()"></label>
+      </div>
+      <label class="chk" style="${ref.startsWith('sv:') ? 'display:none' : ''}"><input type="checkbox" id="nf-save"> In „Meine Lebensmittel" speichern</label>
+      <input type="hidden" id="nf-name" value="${escapeHtml(base.name + (base.brand ? ' (' + base.brand + ')' : ''))}">
+      <button class="save-workout-btn" onclick="nutQtyAdd()">Hinzufügen</button>
+    </div>`;
+  root.appendChild(sheet);
+  // Werte initial füllen
+  if (isDB) nutGramsRecalc();
+  else { const set = (i, v) => { const el = document.getElementById(i); if (el) el.value = Math.round(v || 0); };
+    set('nf-kcal', base.kcal); set('nf-protein', base.protein); set('nf-carbs', base.carbs); set('nf-fat', base.fat); }
+}
+function closeQty() { document.getElementById('qty-overlay')?.remove(); nutPer100 = null; nutServingG = null; }
+
+// Aus dem Mengen-Sheet hinzufügen — Sheet schließen, Suche bleibt offen (Mehrfach-Hinzufügen)
+function nutQtyAdd() {
+  let name = val('nf-name'); const kcal = nutNum('nf-kcal', NUT_MAX_KCAL);
+  if (!name) { showToast('Keine Bezeichnung', '#c46a04'); return; }
+  if (!kcal) { showToast('Bitte Kalorien angeben', '#c46a04'); return; }
+  if (name.length > NUT_MAX_NAME) name = name.slice(0, NUT_MAX_NAME);
+  const data = loadData();
+  const fields = { name, kcal, protein: nutNum('nf-protein', NUT_MAX_MACRO), carbs: nutNum('nf-carbs', NUT_MAX_MACRO), fat: nutNum('nf-fat', NUT_MAX_MACRO) };
+  data.nutrition.log.push({ id: uid('n'), date: nutDate, meal: nutModalMeal || 'snack', ...fields });
+  const save = document.getElementById('nf-save');
+  if (save && save.checked && !data.nutrition.foods.some(f => (f.name || '').toLowerCase() === name.toLowerCase())) data.nutrition.foods.push({ id: uid('f'), ...fields });
+  saveData(data);
+  closeQty();
+  if (document.getElementById('page-nutrition')?.classList.contains('active')) renderNutrition();
+  showToast('✓ ' + name + ' hinzugefügt', '#0f9d72');
+}
+
+// Kompaktes Sheet zum BEARBEITEN eines bestehenden Eintrags
+function renderFoodEditSheet(editing) {
+  const root = document.getElementById('nut-modal-root');
   root.innerHTML = `
   <div class="modal-overlay" onclick="if(event.target===this)closeFoodModal()">
-    <div class="modal-sheet" role="dialog" aria-label="Lebensmittel hinzufügen">
-      <div class="modal-head">
-        <h3>${editing ? 'Eintrag bearbeiten' : 'Hinzufügen'}</h3>
-        <button class="modal-x" onclick="closeFoodModal()" aria-label="Schließen">✕</button>
-      </div>
-      ${editing ? '' : `
-      <div class="off-search">
-        <div class="off-sec-label">Suchen oder Barcode scannen</div>
-        <div class="off-row">
-          <input id="nf-search" class="input-field" type="search" autocomplete="off" placeholder="🔎 Lebensmittel suchen…" oninput="nutSearchOFF()">
-          <button type="button" class="off-scan" onclick="nutScanBarcode()" aria-label="Barcode scannen" title="Barcode scannen">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5v14"/><path d="M7 5v14"/><path d="M11 5v14"/><path d="M15 5v14"/><path d="M19 5v14"/><path d="M21 5v14"/></svg>
-          </button>
-        </div>
-        <div id="nf-search-results" class="off-results"></div>
-      </div>`}
-      ${editing || !savedFoods.length ? '' : `
-      <div class="saved-foods-block">
-        <div class="sfb-label">Meine Lebensmittel</div>
-        <div class="sfb-row">
-          <select id="nf-saved" class="input-field" onchange="nutPickSavedSel(this.value)">
-            <option value="">— gespeichertes wählen —</option>
-            ${savedOptions}
-          </select>
-          <button type="button" class="sfb-del" id="nf-saved-del" onclick="nutDeleteSelectedFood()" aria-label="Ausgewähltes löschen" title="Ausgewähltes löschen" disabled>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-          </button>
-        </div>
-      </div>
-      <div class="modal-divider"><span>oder neu eingeben</span></div>`}
+    <div class="modal-sheet" role="dialog" aria-label="Eintrag bearbeiten">
+      <div class="modal-head"><h3>Eintrag bearbeiten</h3><button class="modal-x" onclick="closeFoodModal()" aria-label="Schließen">✕</button></div>
       <div class="modal-form">
-        <label>Bezeichnung
-          <input id="nf-name" class="input-field" type="text" list="nf-foodlist" autocomplete="off" maxlength="${NUT_MAX_NAME}" oninput="nutNameSuggest()" placeholder="z. B. Haferflocken mit Milch" value="${editing ? escapeHtml(editing.name || '') : ''}">
-          <datalist id="nf-foodlist">${dataListOptions}</datalist>
-        </label>
-        <div id="nf-grams-wrap" style="display:none">
-          <label>Menge <span class="grams-hint">— Werte skalieren automatisch</span></label>
-          <div class="menge-row">
-            <input id="nf-grams" class="input-field" type="number" inputmode="decimal" min="0" max="5000" placeholder="100" oninput="nutGramsRecalc()">
-            <select id="nf-unit" class="input-field" onchange="nutUnitChange()">
-              <option value="g">g</option>
-              <option value="ml">ml</option>
-              <option value="port" id="nf-unit-port" style="display:none">Portion</option>
-            </select>
-          </div>
-        </div>
-        <label>Kalorien (kcal)
-          <input id="nf-kcal" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_KCAL}" placeholder="0" oninput="nutManualEdit()" value="${editing ? (editing.kcal ?? '') : ''}">
-        </label>
+        <label>Bezeichnung<input id="nf-name" class="input-field" type="text" maxlength="${NUT_MAX_NAME}" value="${escapeHtml(editing.name || '')}"></label>
+        <label>Kalorien (kcal)<input id="nf-kcal" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_KCAL}" value="${editing.kcal ?? ''}"></label>
         <div class="macro-inputs">
-          <label>Eiweiß (g)<input id="nf-protein" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_MACRO}" placeholder="0" oninput="nutManualEdit()" value="${editing ? (editing.protein ?? '') : ''}"></label>
-          <label>KH (g)<input id="nf-carbs" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_MACRO}" placeholder="0" oninput="nutManualEdit()" value="${editing ? (editing.carbs ?? '') : ''}"></label>
-          <label>Fett (g)<input id="nf-fat" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_MACRO}" placeholder="0" oninput="nutManualEdit()" value="${editing ? (editing.fat ?? '') : ''}"></label>
+          <label>Eiweiß (g)<input id="nf-protein" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_MACRO}" value="${editing.protein ?? ''}"></label>
+          <label>KH (g)<input id="nf-carbs" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_MACRO}" value="${editing.carbs ?? ''}"></label>
+          <label>Fett (g)<input id="nf-fat" class="input-field" type="number" inputmode="decimal" min="0" max="${NUT_MAX_MACRO}" value="${editing.fat ?? ''}"></label>
         </div>
-        ${editing ? '' : `<label class="chk"><input type="checkbox" id="nf-save"> In „Meine Lebensmittel" speichern</label>`}
       </div>
       <div class="modal-actions">
-        ${editing ? `<button class="btn-ghost-danger" onclick="nutDeleteEntry('${editing.id}', true)">Löschen</button>` : ''}
-        <button class="save-workout-btn" onclick="nutSaveEntry(${editing ? `'${editing.id}'` : 'null'})">${editing ? 'Speichern' : 'Hinzufügen'}</button>
+        <button class="btn-ghost-danger" onclick="nutDeleteEntry('${editing.id}', true)">Löschen</button>
+        <button class="save-workout-btn" onclick="nutSaveEntry('${editing.id}')">Speichern</button>
       </div>
     </div>
   </div>`;
-  setTimeout(() => { const n = document.getElementById('nf-name'); if (n && !editing) n.focus(); }, 50);
 }
 
 function closeFoodModal() {
@@ -2776,27 +2899,28 @@ function nutSearchOFF() {
   const q = (document.getElementById('nf-search')?.value || '').trim();
   const box = document.getElementById('nf-search-results');
   if (!box) return;
-  if (q.length < 3) { box.innerHTML = ''; return; }
+  if (q.length < 3) { nutQuickList(); return; }               // leer → gespeicherte zeigen
   const reqId = (window._offReq = (window._offReq || 0) + 1);   // nur letzte Suche anzeigen
-  box.innerHTML = '<div class="off-msg">Suche…</div>';
+  box.innerHTML = '<div class="fs-msg">Suche…</div>';
   _offTimer = setTimeout(async () => {
     const url = 'https://world.openfoodfacts.org/cgi/search.pl?search_terms=' + encodeURIComponent(q) +
       '&search_simple=1&action=process&json=1&page_size=20&fields=product_name,brands,nutriments,serving_quantity';
     const d = await offFetch(url, 3);
     if (reqId !== window._offReq) return;                       // veraltetes Ergebnis verwerfen
-    if (!d) { box.innerHTML = '<div class="off-msg">Datenbank gerade nicht erreichbar — bitte nochmal tippen oder Werte manuell eingeben.</div>'; return; }
+    if (!d) { box.innerHTML = '<div class="fs-msg">Datenbank gerade nicht erreichbar — bitte nochmal tippen oder „Manuell" nutzen.</div>'; return; }
     const items = (d.products || []).filter(p => p.product_name && p.nutriments && p.nutriments['energy-kcal_100g'] != null);
-    if (!items.length) { box.innerHTML = '<div class="off-msg">Nichts gefunden — gib die Werte unten manuell ein.</div>'; return; }
+    if (!items.length) { box.innerHTML = '<div class="fs-msg">Nichts gefunden — trage es über „Manuell" ein.</div>'; return; }
     window._offCache = {};
-    box.innerHTML = items.slice(0, 14).map((p, i) => {
+    box.innerHTML = items.slice(0, 18).map((p, i) => {
       const n = p.nutriments; const id = 'off' + i;
+      const servingG = parseFloat(p.serving_quantity) || null;
       window._offCache[id] = { name: p.product_name, brand: (p.brands || '').split(',')[0].trim(),
         kcal: Math.round(n['energy-kcal_100g'] || 0), protein: +n.proteins_100g || 0, carbs: +n.carbohydrates_100g || 0, fat: +n.fat_100g || 0,
-        servingG: parseFloat(p.serving_quantity) || null };
+        servingG };
       const f = window._offCache[id];
-      return `<button type="button" class="off-item" onclick="nutPickOFF('${id}')">
-        <span class="oi-name">${escapeHtml(p.product_name)}${f.brand ? ' · ' + escapeHtml(f.brand) : ''}</span>
-        <span class="oi-kcal">${f.kcal} kcal<small>/100g</small></span></button>`;
+      const sub = (f.brand ? f.brand + ' · ' : '') + (servingG ? '1 Portion (' + Math.round(servingG) + ' g)' : 'pro 100 g');
+      const kcalShown = servingG ? Math.round(f.kcal * servingG / 100) : f.kcal;
+      return foodItemHTML('off:' + id, f.name, sub, kcalShown);
     }).join('');
   }, 550);
 }
@@ -2888,7 +3012,9 @@ async function nutLookupBarcode(code) {
     window._offCache.bc = { name: p.product_name || ('Produkt ' + code), brand: (p.brands || '').split(',')[0].trim(),
       kcal: Math.round(n['energy-kcal_100g'] || 0), protein: +n.proteins_100g || 0, carbs: +n.carbohydrates_100g || 0, fat: +n.fat_100g || 0,
       servingG: parseFloat(p.serving_quantity) || null };
-    nutPickOFF('bc');
+    // Falls das Vollbild-Hinzufügen offen ist → Mengen-Sheet; sonst Modal öffnen
+    if (!document.getElementById('food-screen')) openFoodModal(nutModalMeal || 'snack');
+    nutOpenQty('bc:bc');
     showToast('✓ ' + (p.product_name || 'Produkt') + ' gefunden', '#0f9d72');
   } catch (e) { showToast('Keine Verbindung zur Datenbank', '#c0392b'); }
 }
