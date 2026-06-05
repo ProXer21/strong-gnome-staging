@@ -584,6 +584,20 @@ function renderDashboard() {
     document.getElementById('dn-bar').style.width = pct + '%';
     document.getElementById('dn-bar').style.background = rem < 0 ? 'var(--danger)' : 'var(--grad-primary)';
   }
+
+  // Schnellzugriff: Mahlzeiten-Chips → direkt zur Detailansicht
+  const dashMeals = document.getElementById('dash-meals');
+  if (dashMeals) {
+    const todayE = nutDayEntries(data, nutToday());
+    dashMeals.innerHTML = MEALS.map(meal => {
+      const sub = todayE.filter(e => e.meal === meal.key).reduce((s, e) => s + (+e.kcal || 0), 0);
+      return `<button type="button" class="dm-chip" onclick="openMealQuick('${meal.key}')">
+        <span class="dm-emoji">${meal.emoji}</span>
+        <span class="dm-label">${meal.label}</span>
+        <span class="dm-kcal">${nutFmt(sub)} kcal</span>
+      </button>`;
+    }).join('');
+  }
 }
 
 // ─── Training: Ansichten ──────────────────────────────────────────────────────
@@ -2738,6 +2752,9 @@ function openMealDetail(mealKey) {
 
 function closeMealDetail() { nutDetailMeal = null; closeFoodModal(); }
 
+// Schnellzugriff vom Start: immer „heute", dann Detailansicht öffnen
+function openMealQuick(mealKey) { nutDate = nutToday(); openMealDetail(mealKey); }
+
 // Eintrag aus der Detailansicht bearbeiten (behält die Detail-Rückkehr bei)
 function nutEditEntry(mealKey, entryId) {
   nutModalMeal = mealKey; nutPer100 = null; nutServingG = null;
@@ -3418,6 +3435,8 @@ const TUTORIAL_STEPS = [
     text: 'Ganz oben siehst du immer dein aktuelles Gewicht, wie viel du schon abgenommen hast und wie weit es noch bis zu deinem Ziel ist. Den Balken füllst du, indem du dich regelmäßig wiegst.' },
   { page: 'dashboard', target: '#dash-nut', title: 'Deine Kalorien heute',
     text: 'Diese Karte zeigt dir auf einen Blick, wie viele Kalorien du heute schon gegessen hast und wie viele noch übrig sind. Tippe darauf, um direkt zur Ernährung zu kommen.' },
+  { page: 'dashboard', target: '#dash-meals', title: 'Mahlzeiten-Schnellzugriff',
+    text: 'Direkt vom Start aus kommst du hier mit einem Tipp zu Frühstück, Mittagessen, Abendessen oder Snacks — du siehst sofort die heutigen Kalorien jeder Mahlzeit und kannst blitzschnell etwas eintragen.' },
   { page: 'nutrition', target: '.nut-summary', title: 'Essen & Kalorien tracken',
     text: 'Deine Ernährungs-Seite. Der Bogen zeigt die Kalorien, darunter Eiweiß/Kohlenhydrate/Fett. Mit „+ Hinzufügen" trägst du Mahlzeiten ein — entweder per Datenbank-Suche, Barcode-Scan oder von Hand. Ganz unten siehst du deinen 7-Tage-Verlauf, über das Zahnrad oben rechts dein Tagesziel.' },
   { page: 'nutrition', target: '#nut-meals .nm-card', title: 'Mahlzeit-Details öffnen',

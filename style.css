@@ -1855,6 +1855,14 @@ body:not([data-state="app"]) .page { display: none !important; }
 .dnc-rem { font-size: 13px; font-weight: 800; color: var(--mint); white-space: nowrap; }
 .dnc-rem.over { color: var(--danger); }
 
+/* Schnellzugriff: Mahlzeiten-Chips auf dem Start */
+.dash-meals { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 18px; }
+.dm-chip { display: flex; flex-direction: column; align-items: center; gap: 3px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 11px 4px; cursor: pointer; box-shadow: var(--shadow-sm); min-height: 74px; transition: background .15s, transform .1s; }
+.dm-chip:active { background: var(--primary-50); transform: scale(.96); }
+.dm-emoji { font-size: 21px; line-height: 1; }
+.dm-label { font-size: 11px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.dm-kcal { font-size: 11px; font-weight: 600; color: var(--text-muted); }
+
 /* Datumsleiste */
 .nut-datebar { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 4px 0 14px; font-weight: 800; }
 .nd-arrow { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 22px; line-height: 1; cursor: pointer; box-shadow: var(--shadow-sm); }
