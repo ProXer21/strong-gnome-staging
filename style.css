@@ -2131,3 +2131,16 @@ input.input-field, select.input-field, textarea.input-field { padding: 9px 12px;
 .qty-sheet .macro-inputs { margin-top: 8px; }
 .qty-sheet .chk { margin-top: 12px; }
 .qty-sheet .save-workout-btn { margin-top: 14px; }
+
+/* Multi-Select in „Meine Lebensmittel" (Long-Press) */
+.fs-hinttiny { font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--text-muted); font-size: 11px; }
+.fs-selbar { display: flex; align-items: center; gap: 12px; padding: 6px 0 10px; }
+.fs-selbar > span { flex: 1; font-weight: 800; font-size: 15px; color: var(--text); }
+.selbar-x { width: 34px; height: 34px; flex: 0 0 auto; border: none; background: var(--border); border-radius: 50%; font-size: 15px; color: var(--text); cursor: pointer; }
+.selbar-del { background: var(--danger); color: #fff; border: none; border-radius: 999px; font-weight: 800; font-size: 14px; padding: 9px 20px; cursor: pointer; }
+.selbar-del:disabled { opacity: .4; }
+.saved-item { gap: 12px; }
+.saved-item.sel { background: var(--primary-50); border-radius: 12px; border-bottom-color: transparent; }
+.fi-check { flex: 0 0 auto; width: 24px; height: 24px; border: 2px solid var(--border); border-radius: 50%; position: relative; background: var(--surface); }
+.fi-check.on { background: var(--primary); border-color: var(--primary); }
+.fi-check.on::after { content: ''; position: absolute; left: 8px; top: 4px; width: 5px; height: 10px; border: solid #fff; border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); }

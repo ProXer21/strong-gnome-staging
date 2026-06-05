@@ -2658,6 +2658,7 @@ const FS_ICONS = {
 // Vollbild-Hinzufügen (Suche · Barcode · Manuell) im großen Kachel-Stil
 function renderFoodAddScreen(meal) {
   const root = document.getElementById('nut-modal-root');
+  nutSelMode = false; nutSel.clear();
   const mealLabel = (MEALS.find(m => m.key === meal) || {}).label || 'Mahlzeit';
   root.innerHTML = `
   <div class="food-screen" id="food-screen">
@@ -2675,7 +2676,7 @@ function renderFoodAddScreen(meal) {
       <div id="fs-search-pane">
         <div class="fs-searchbar">
           <span class="fsb-ic">${FS_ICONS.search}</span>
-          <input id="nf-search" type="search" autocomplete="off" placeholder="Was hattest du zum ${escapeHtml(mealLabel)}?" oninput="nutSearchOFF()">
+          <input id="nf-search" type="search" autocomplete="off" placeholder="${meal === 'snack' ? 'Was hast du gesnackt?' : 'Was hattest du zum ' + escapeHtml(mealLabel) + '?'}" oninput="nutSearchOFF()">
         </div>
         <div id="nf-search-results" class="fs-results"></div>
       </div>
@@ -2734,17 +2735,84 @@ function foodSetMode(mode) {
   }
 }
 
+// Auswahl-Modus für „Meine Lebensmittel" (Long-Press → mehrere markieren → löschen)
+let nutSelMode = false;
+let nutSel = new Set();
+
 // Gespeicherte Lebensmittel als Schnellliste (bei leerer Suche)
 function nutQuickList() {
   const box = document.getElementById('nf-search-results'); if (!box) return;
   const data = loadData();
   const foods = data.nutrition.foods.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', 'de'));
   window._savedCache = {};
-  if (!foods.length) { box.innerHTML = '<div class="fs-hint">Suche ein Lebensmittel oder scanne einen Barcode — oder trage es über „Manuell" ein.</div>'; return; }
-  box.innerHTML = '<div class="fs-listhead">Meine Lebensmittel</div>' + foods.map((f, i) => {
-    const id = 'sv' + i; window._savedCache[id] = f;
-    return foodItemHTML('sv:' + id, f.name, '100 g', Math.round(f.kcal || 0));
+  if (!foods.length) {
+    nutSelMode = false; nutSel.clear();
+    box.innerHTML = '<div class="fs-hint">Suche ein Lebensmittel oder scanne einen Barcode — oder trage es über „Manuell" ein.</div>';
+    return;
+  }
+  foods.forEach(f => { window._savedCache[f.id] = f; });
+  // nicht mehr existierende Auswahl bereinigen
+  [...nutSel].forEach(id => { if (!foods.some(f => f.id === id)) nutSel.delete(id); });
+
+  const head = nutSelMode
+    ? `<div class="fs-selbar">
+         <button class="selbar-x" onclick="nutCancelSelect()" aria-label="Abbrechen">✕</button>
+         <span>${nutSel.size} ausgewählt</span>
+         <button class="selbar-del" onclick="nutDeleteSelected()" ${nutSel.size ? '' : 'disabled'}>Löschen</button>
+       </div>`
+    : `<div class="fs-listhead">Meine Lebensmittel <span class="fs-hinttiny">· lang drücken zum Auswählen</span></div>`;
+
+  box.innerHTML = head + foods.map(f => {
+    const sel = nutSel.has(f.id);
+    return `<div class="fs-item saved-item${sel ? ' sel' : ''}" data-fid="${f.id}" role="button">
+      ${nutSelMode ? `<span class="fi-check${sel ? ' on' : ''}"></span>` : ''}
+      <span class="fi-info"><span class="fi-name">${escapeHtml(f.name)}</span>
+        <span class="fi-sub">E ${nutFmt(f.protein)} · KH ${nutFmt(f.carbs)} · F ${nutFmt(f.fat)} g</span></span>
+      ${nutSelMode ? '' : `<span class="fi-kcal">${Math.round(f.kcal || 0)} kcal</span><span class="fi-plus" aria-hidden="true">+</span>`}
+    </div>`;
   }).join('');
+
+  box.querySelectorAll('.saved-item').forEach(nutAttachSavedHandlers);
+}
+
+// Klick + Long-Press an einer gespeicherten Zeile
+function nutAttachSavedHandlers(el) {
+  const fid = el.dataset.fid;
+  let timer = null, longed = false;
+  const start = () => { longed = false; timer = setTimeout(() => { longed = true; nutEnterSelect(fid); }, 450); };
+  const cancel = () => clearTimeout(timer);
+  el.addEventListener('pointerdown', start);
+  el.addEventListener('pointerup', cancel);
+  el.addEventListener('pointermove', cancel);
+  el.addEventListener('pointercancel', cancel);
+  el.addEventListener('pointerleave', cancel);
+  el.addEventListener('click', () => {
+    if (longed) { longed = false; return; }   // Long-Press hat schon Auswahl gestartet
+    if (nutSelMode) nutToggleSel(fid);
+    else nutOpenQty('sv:' + fid);
+  });
+}
+
+function nutEnterSelect(fid) {
+  nutSelMode = true; nutSel = new Set([fid]);
+  try { navigator.vibrate && navigator.vibrate(25); } catch (e) {}
+  nutQuickList();
+}
+function nutToggleSel(fid) {
+  if (nutSel.has(fid)) nutSel.delete(fid); else nutSel.add(fid);
+  nutQuickList();
+}
+function nutCancelSelect() { nutSelMode = false; nutSel.clear(); nutQuickList(); }
+function nutDeleteSelected() {
+  if (!nutSel.size) return;
+  if (!confirm(`${nutSel.size} Lebensmittel aus „Meine Lebensmittel" löschen?`)) return;
+  const data = loadData();
+  data.nutrition.foods = (data.nutrition.foods || []).filter(f => !nutSel.has(f.id));
+  saveData(data);
+  const n = nutSel.size;
+  nutSelMode = false; nutSel.clear();
+  nutQuickList();
+  showToast(`${n} gelöscht`, '#6d5a67');
 }
 
 // Eine Ergebnis-Zeile (Name · Portion · kcal · +)
@@ -2900,6 +2968,7 @@ function nutSearchOFF() {
   const box = document.getElementById('nf-search-results');
   if (!box) return;
   if (q.length < 3) { nutQuickList(); return; }               // leer → gespeicherte zeigen
+  nutSelMode = false; nutSel.clear();                          // Auswahl-Modus gilt nur für die Schnellliste
   const reqId = (window._offReq = (window._offReq || 0) + 1);   // nur letzte Suche anzeigen
   box.innerHTML = '<div class="fs-msg">Suche…</div>';
   _offTimer = setTimeout(async () => {
