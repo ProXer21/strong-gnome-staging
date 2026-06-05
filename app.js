@@ -2754,6 +2754,21 @@ function nutNameSuggest() {
   set('nf-kcal', f.kcal); set('nf-protein', f.protein); set('nf-carbs', f.carbs); set('nf-fat', f.fat);
 }
 
+// Robuster JSON-Fetch mit mehreren Versuchen (OFF-Server hakt zeitweise)
+async function offFetch(url, tries) {
+  tries = tries || 3;
+  for (let i = 0; i < tries; i++) {
+    try {
+      const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 7000);
+      const r = await fetch(url, { signal: ctrl.signal, headers: { Accept: 'application/json' } });
+      clearTimeout(to);
+      if (r.ok) { const d = await r.json(); if (d) return d; }
+    } catch (e) { /* nächster Versuch */ }
+    await new Promise(res => setTimeout(res, 600 * (i + 1)));   // Backoff (gibt Rate-Limit Zeit zur Erholung)
+  }
+  return null;
+}
+
 // ── Open Food Facts: Lebensmittel-Suche (gratis, keine Anmeldung nötig) ──
 function nutSearchOFF() {
   clearTimeout(_offTimer);
@@ -2761,31 +2776,28 @@ function nutSearchOFF() {
   const box = document.getElementById('nf-search-results');
   if (!box) return;
   if (q.length < 3) { box.innerHTML = ''; return; }
+  const reqId = (window._offReq = (window._offReq || 0) + 1);   // nur letzte Suche anzeigen
   box.innerHTML = '<div class="off-msg">Suche…</div>';
   _offTimer = setTimeout(async () => {
-    try {
-      const url = 'https://world.openfoodfacts.org/cgi/search.pl?search_terms=' + encodeURIComponent(q) +
-        '&search_simple=1&action=process&json=1&page_size=20&fields=product_name,brands,nutriments,serving_quantity';
-      const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 9000);
-      const r = await fetch(url, { signal: ctrl.signal }); clearTimeout(to);
-      const d = await r.json();
-      const items = (d.products || []).filter(p => p.product_name && p.nutriments && p.nutriments['energy-kcal_100g'] != null);
-      if (!items.length) { box.innerHTML = '<div class="off-msg">Nichts gefunden — gib die Werte unten manuell ein.</div>'; return; }
-      window._offCache = {};
-      box.innerHTML = items.slice(0, 14).map((p, i) => {
-        const n = p.nutriments; const id = 'off' + i;
-        window._offCache[id] = { name: p.product_name, brand: (p.brands || '').split(',')[0].trim(),
-          kcal: Math.round(n['energy-kcal_100g'] || 0), protein: +n.proteins_100g || 0, carbs: +n.carbohydrates_100g || 0, fat: +n.fat_100g || 0,
-          servingG: parseFloat(p.serving_quantity) || null };
-        const f = window._offCache[id];
-        return `<button type="button" class="off-item" onclick="nutPickOFF('${id}')">
-          <span class="oi-name">${escapeHtml(p.product_name)}${f.brand ? ' · ' + escapeHtml(f.brand) : ''}</span>
-          <span class="oi-kcal">${f.kcal} kcal<small>/100g</small></span></button>`;
-      }).join('');
-    } catch (e) {
-      box.innerHTML = '<div class="off-msg">Keine Verbindung zur Datenbank — bitte manuell eingeben.</div>';
-    }
-  }, 450);
+    const url = 'https://world.openfoodfacts.org/cgi/search.pl?search_terms=' + encodeURIComponent(q) +
+      '&search_simple=1&action=process&json=1&page_size=20&fields=product_name,brands,nutriments,serving_quantity';
+    const d = await offFetch(url, 3);
+    if (reqId !== window._offReq) return;                       // veraltetes Ergebnis verwerfen
+    if (!d) { box.innerHTML = '<div class="off-msg">Datenbank gerade nicht erreichbar — bitte nochmal tippen oder Werte manuell eingeben.</div>'; return; }
+    const items = (d.products || []).filter(p => p.product_name && p.nutriments && p.nutriments['energy-kcal_100g'] != null);
+    if (!items.length) { box.innerHTML = '<div class="off-msg">Nichts gefunden — gib die Werte unten manuell ein.</div>'; return; }
+    window._offCache = {};
+    box.innerHTML = items.slice(0, 14).map((p, i) => {
+      const n = p.nutriments; const id = 'off' + i;
+      window._offCache[id] = { name: p.product_name, brand: (p.brands || '').split(',')[0].trim(),
+        kcal: Math.round(n['energy-kcal_100g'] || 0), protein: +n.proteins_100g || 0, carbs: +n.carbohydrates_100g || 0, fat: +n.fat_100g || 0,
+        servingG: parseFloat(p.serving_quantity) || null };
+      const f = window._offCache[id];
+      return `<button type="button" class="off-item" onclick="nutPickOFF('${id}')">
+        <span class="oi-name">${escapeHtml(p.product_name)}${f.brand ? ' · ' + escapeHtml(f.brand) : ''}</span>
+        <span class="oi-kcal">${f.kcal} kcal<small>/100g</small></span></button>`;
+    }).join('');
+  }, 550);
 }
 
 // Datenbank-Treffer übernehmen → „je 100 g"-Referenz setzen, Menge-Feld + Einheiten zeigen
@@ -2867,9 +2879,8 @@ function nutStopScan() {
 async function nutLookupBarcode(code) {
   showToast('Barcode ' + code + ' — suche Produkt…');
   try {
-    const r = await fetch('https://world.openfoodfacts.org/api/v2/product/' + encodeURIComponent(code) + '.json?fields=product_name,brands,nutriments,serving_quantity');
-    const d = await r.json();
-    const p = d.product;
+    const d = await offFetch('https://world.openfoodfacts.org/api/v2/product/' + encodeURIComponent(code) + '.json?fields=product_name,brands,nutriments,serving_quantity', 3);
+    const p = d && d.product;
     if (!p || !p.nutriments || p.nutriments['energy-kcal_100g'] == null) { showToast('Produkt nicht gefunden — bitte manuell', '#c46a04'); return; }
     const n = p.nutriments;
     window._offCache = window._offCache || {};
